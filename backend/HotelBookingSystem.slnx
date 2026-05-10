@@ -3,6 +3,7 @@
   <Project Path="ApiGateway/ApiGateway.csproj" />
   <Project Path="CommentsService/CommentsService.csproj" />
   <Project Path="HotelService/HotelService.csproj" />
+  <Project Path="HotelService.Tests/HotelService.Tests.csproj" />
   <Project Path="NotificationService/NotificationService.csproj" />
   <Project Path="SharedKernel/SharedKernel.csproj" />
 </Solution>

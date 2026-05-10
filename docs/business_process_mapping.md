@@ -223,19 +223,21 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ### 3. Hotel Service — Booking
 
-#### `GET /api/v1/hotels/{hotelId}/rooms/{roomId}`
+#### `GET /api/v1/hotels/{hotelId}/rooms/{roomTypeId}`
 
-- **Description:** Fetches room details including the current `RowVersion` token. The client must call this endpoint before submitting a booking to obtain the `rowVersion` required for optimistic concurrency control.
+- **Description:** Fetches room details including the current `RowVersion` token and `inventoryId`. The client must call this endpoint before submitting a booking to obtain the `inventoryId` and `rowVersion` required for optimistic concurrency control.
 - **Security:** Public.
+- **Query Parameters (optional):** `startDate`, `endDate` — when provided, the returned inventory block must fully cover the requested stay dates. Recommended: pass the same dates used in the search.
   **Response (200 OK):**
 
 ```json
 {
-  "roomId": "room-uuid-123",
-  "hotelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "roomTypeId": "22222222-0000-0000-0000-000000000001",
+  "hotelId": "11111111-0000-0000-0000-000000000001",
   "roomType": "Standard",
-  "pricePerNight": 10948.0,
-  "availableCount": 3,
+  "pricePerNight": 350.0,
+  "availableCount": 10,
+  "inventoryId": "33333333-0000-0000-0000-000000000001",
   "rowVersion": "AAAAAAAAAAA="
 }
 ```
@@ -246,16 +248,17 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 - **Description:** Creates a reservation. Executes an optimistic concurrency check using the `rowVersion` token to prevent overbooking. On success, decrements capacity in SQL and publishes a `ReservationCreatedEvent` to RabbitMQ.
 - **Security:** Authenticated (User). Requires Bearer JWT.
-- **Precondition:** Valid User JWT AND `rowVersion` token provided AND `StartDate` < `EndDate` AND `GuestCount` >= 1.
+- **Precondition:** Valid User JWT AND `inventoryId` + `rowVersion` token provided (from prior `GET /api/v1/hotels/{hotelId}/rooms/{roomTypeId}`) AND `StartDate` < `EndDate` AND `GuestCount` >= 1 AND requested dates fall within the selected inventory block's date range.
 - **Postcondition:** `AvailableCount -= 1` in `InventoryBlocks` (SQL) AND `Booking` record created in `BookingDbContext` AND `ReservationCreatedEvent` published to RabbitMQ.
   **Request Body:**
 
 ```json
 {
-  "hotelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "roomId": "room-uuid-123",
-  "startDate": "2026-06-01T00:00:00Z",
-  "endDate": "2026-06-05T00:00:00Z",
+  "hotelId": "11111111-0000-0000-0000-000000000001",
+  "roomTypeId": "22222222-0000-0000-0000-000000000001",
+  "inventoryId": "33333333-0000-0000-0000-000000000001",
+  "startDate": "2026-05-15",
+  "endDate": "2026-05-20",
   "guestCount": 2,
   "rowVersion": "AAAAAAAAAAA="
 }
@@ -355,10 +358,11 @@ This document serves as the foundational blueprint for the Hotel Booking System.
   "userMessage": "Yes, book it",
   "contextState": {
     "pendingAction": "BOOK",
-    "targetHotelId": "izmir-hotel-1",
-    "targetRoomId": "room-uuid-123",
-    "startDate": "2026-05-16T00:00:00Z",
-    "endDate": "2026-05-18T00:00:00Z",
+    "targetHotelId": "11111111-0000-0000-0000-000000000001",
+    "targetRoomTypeId": "22222222-0000-0000-0000-000000000001",
+    "targetInventoryId": "33333333-0000-0000-0000-000000000001",
+    "startDate": "2026-05-16",
+    "endDate": "2026-05-18",
     "guestCount": 2,
     "rowVersion": "AAAAAAAAAAA="
   }
@@ -385,14 +389,15 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ```json
 {
-  "reply": "I found 3 great hotels in Izmir for next weekend. The top choice is Swissôtel Büyük Efes at 10,948 TL/night. Would you like me to confirm a reservation there?",
+  "reply": "I found 3 great hotels in Izmir for next weekend. The top choice is Swissôtel Büyük Efes Izmir at 3,100 TL/night. Would you like me to confirm a reservation there?",
   "requiresConfirmation": true,
   "contextState": {
     "pendingAction": "BOOK",
-    "targetHotelId": "izmir-hotel-1",
-    "targetRoomId": "room-uuid-123",
-    "startDate": "2026-05-16T00:00:00Z",
-    "endDate": "2026-05-18T00:00:00Z",
+    "targetHotelId": "11111111-0000-0000-0000-000000000001",
+    "targetRoomTypeId": "22222222-0000-0000-0000-000000000001",
+    "targetInventoryId": "33333333-0000-0000-0000-000000000001",
+    "startDate": "2026-05-16",
+    "endDate": "2026-05-18",
     "guestCount": 2,
     "rowVersion": "AAAAAAAAAAA="
   }
@@ -403,7 +408,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ```json
 {
-  "reply": "Your reservation at Swissôtel Büyük Efes from May 16–18 is confirmed! Booking ID: booking-guid-456.",
+  "reply": "Your reservation at Swissôtel Büyük Efes Izmir from May 16–18 is confirmed! Booking ID: booking-guid-456.",
   "requiresConfirmation": false,
   "contextState": null
 }
@@ -432,12 +437,13 @@ This document serves as the foundational blueprint for the Hotel Booking System.
   "eventId": "evt-uuid-789",
   "bookingId": "booking-guid-456",
   "userId": "user-uuid-101",
-  "hotelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "hotelName": "Hyde Bodrum",
-  "roomId": "room-uuid-123",
-  "startDate": "2026-06-01T00:00:00Z",
-  "endDate": "2026-06-05T00:00:00Z",
+  "hotelId": "11111111-0000-0000-0000-000000000001",
+  "hotelName": "The Grand Manhattan Hotel",
+  "roomTypeId": "22222222-0000-0000-0000-000000000001",
+  "checkInDate": "2026-05-15",
+  "checkOutDate": "2026-05-20",
   "guestCount": 2,
+  "totalAmount": 1750.00,
   "publishedAt": "2026-05-10T14:30:00Z"
 }
 ```

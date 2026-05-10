@@ -105,7 +105,7 @@ The master record for hotel properties. Managed by Hotel Service — admin endpo
 | :------------ | :----------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------- |
 | `HotelId`     | `UNIQUEIDENTIFIER` | Primary Key, Default `NEWID()` | Unique identifier for the hotel.                                                                             |
 | `Name`        | `NVARCHAR(100)`    | Not Null                       | Display name, e.g., "Hyde Bodrum - Yetişkin Oteli".                                                          |
-| `Destination` | `NVARCHAR(100)`    | Not Null, **Indexed**          | City/region string used for Hotel Service search endpoint destination filtering, e.g., "Bodrum, Muğla".      |
+| `Destination` | `NVARCHAR(100)`    | Not Null, **Indexed**          | City/region string used for Hotel Service search endpoint destination filtering, e.g., "Bodrum".              |
 | `Latitude`    | `DECIMAL(9,6)`     | Not Null                       | Geographic latitude. Required for "Haritada göster" map feature.                                             |
 | `Longitude`   | `DECIMAL(9,6)`     | Not Null                       | Geographic longitude. Required for "Haritada göster" map feature.                                            |
 | `BaseRating`   | `DECIMAL(3,1)` | Nullable                      | Denormalized aggregated rating from the Comments Service. Nullable since a new hotel may have no reviews. |
@@ -354,7 +354,7 @@ To enable meaningful UI and API testing without manual data entry, the following
 
 | Entity            | Seed Count       | Details                                                                                                                                                                  |
 | :---------------- | :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Hotels`          | 5–10             | Mix of cities (Istanbul, Izmir, Bodrum, Antalya). Must include valid `Latitude`/`Longitude` values for the map feature.                                                  |
-| `RoomTypes`       | 2–3 per hotel    | At least "Standard" and "Aile" types per hotel, matching the Admin UI dropdown.                                                                                          |
+| `Hotels`          | 5–10             | Mix of cities (Istanbul ×2, Izmir ×1, Bodrum ×2, Antalya ×2). Must include valid `Latitude`/`Longitude` values for the map feature.                                     |
+| `RoomTypes`       | 2–3 per hotel    | At least "Standard" and "Family" types per hotel, matching the Admin UI dropdown.                                                                                        |
 | `InventoryBlocks` | 3–5 per RoomType | Cover the next 90 days with varied `AvailableCount` values. Include at least one block with `AvailableCount < 20%` of `TotalCount` to verify the nightly cron job alert. |
 | `Bookings`        | 3–5              | Sample confirmed bookings with valid `UserId` values from the seeded IAM test users.                                                                                     |
