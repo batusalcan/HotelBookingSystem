@@ -46,6 +46,8 @@ erDiagram
         decimal(9_6) Latitude
         decimal(9_6) Longitude
         decimal(3_1) BaseRating
+        int TotalReviews
+        nvarchar(500) ImageUrl "nullable, nice-to-have"
         bit IsActive
     }
 
@@ -106,8 +108,10 @@ The master record for hotel properties. Managed by Hotel Service — admin endpo
 | `Destination` | `NVARCHAR(100)`    | Not Null, **Indexed**          | City/region string used for Hotel Service search endpoint destination filtering, e.g., "Bodrum, Muğla".      |
 | `Latitude`    | `DECIMAL(9,6)`     | Not Null                       | Geographic latitude. Required for "Haritada göster" map feature.                                             |
 | `Longitude`   | `DECIMAL(9,6)`     | Not Null                       | Geographic longitude. Required for "Haritada göster" map feature.                                            |
-| `BaseRating`  | `DECIMAL(3,1)`     | Nullable                       | Fallback aggregated rating cached from the Comments Service. Nullable since a new hotel may have no reviews. |
-| `IsActive`    | `BIT`              | Not Null, Default `1`          | Soft-delete flag. Inactive hotels do not appear in search results.                                           |
+| `BaseRating`   | `DECIMAL(3,1)` | Nullable                      | Denormalized aggregated rating from the Comments Service. Nullable since a new hotel may have no reviews. |
+| `TotalReviews` | `INT`          | Not Null, Default `0`         | Denormalized total review count from the Comments Service. Required by the search result UI ("3 yorum"). Seeded with realistic values; updated manually or by a batch sync — never queried live from Comments during search (latency constraint). |
+| `ImageUrl`     | `NVARCHAR(500)` | **Nullable** (Nice-to-Have)  | URL of the hotel's primary display image. Optional field — the project spec lists image uploading as a nice-to-have. If implemented, the admin `POST /api/v1/admin/hotels` endpoint accepts this field; the image itself is uploaded to an external storage service (e.g., Azure Blob Storage) and the resulting URL stored here. |
+| `IsActive`     | `BIT`          | Not Null, Default `1`         | Soft-delete flag. Inactive hotels do not appear in search results.                                       |
 
 **Indexes:**
 
@@ -139,8 +143,8 @@ Tracks room availability for specific date ranges. This is the most critical tab
 | `RoomTypeId`     | `UNIQUEIDENTIFIER`         | Foreign Key → `RoomTypes(RoomTypeId)`, Not Null | Links to the room category this block applies to.                                                                                                                                  |
 | `StartDate`      | `DATE`                     | Not Null, **Indexed**                           | Start of the availability window. Maps to the Admin UI "Başlangıç" field.                                                                                                          |
 | `EndDate`        | `DATE`                     | Not Null, **Indexed**                           | End of the availability window. Maps to the Admin UI "Bitiş" field. Must satisfy `StartDate < EndDate`.                                                                            |
-| `TotalCount`     | `INT`                      | Not Null, Check `>= 0`                          | Total physical rooms of this type for this date range.                                                                                                                             |
-| `AvailableCount` | `INT`                      | Not Null, Check `>= 0`                          | Currently available rooms. Decremented atomically during a booking transaction.                                                                                                    |
+| `TotalCount`     | `INT`                      | Not Null, Check `>= 0`                          | Total physical rooms of this type for this date range. **Set once on creation** to the value of `AvailableCount` from the admin's "Oda Adedi" input; never modified after that. Exists solely to support the nightly cron ratio: `AvailableCount / TotalCount < 0.20`. |
+| `AvailableCount` | `INT`                      | Not Null, Check `>= 0`                          | Currently available rooms. On creation equals `TotalCount`. Decremented atomically during a booking transaction.                                                                   |
 | `IsAvailable`    | `BIT`                      | Not Null, Default `1`                           | Admin-set availability flag. Maps to the "Dolu / Boş" radio button in the Admin UI mockup. Only blocks with `IsAvailable = 1` and `AvailableCount > 0` appear in Search results.   |
 | `RowVersion`     | `ROWVERSION` / `TIMESTAMP` | Not Null, ConcurrencyToken                      | Auto-incremented binary token managed by SQL Server. Used by EF Core for Optimistic Concurrency. The client must send this value back in the `POST /api/v1/bookings` request body. |
 
@@ -295,6 +299,7 @@ Each document in the collection represents the full review state for one hotel, 
       "basePricePerNight": 10948.0,
       "availableRooms": 2,
       "baseRating": 9.6,
+      "totalReviews": 163,
       "roomTypeId": "room-type-uuid-123"
     }
   ]

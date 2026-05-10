@@ -26,7 +26,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 | Step | Action                                                                 | System Component              | Required Data (Data Flow)                                                                   |
 | :--- | :--------------------------------------------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------------ |
-| 1.1  | Admin requests to add or update room availability.                     | API Gateway (Ocelot)          | `Admin JWT`, `HotelId`, `RoomType`, `StartDate`, `EndDate`, `AvailableCount`, `IsAvailable` |
+| 1.1  | Admin requests to add or update room availability.                     | API Gateway (Ocelot)          | `Admin JWT`, `HotelId`, `RoomTypeId`, `StartDate`, `EndDate`, `AvailableCount`, `IsAvailable` |
 | 1.2  | Gateway validates JWT (Admin role) and routes request.                 | API Gateway -> Hotel Service  | `Validated Token`, `Inventory Payload`                                                      |
 | 1.3  | Validate preconditions (`StartDate < EndDate`, `AvailableCount >= 0`). | Hotel Service                 | `Inventory Payload`                                                                         |
 | 1.4  | Update or insert inventory records in the database.                    | Hotel Service -> SQL DB       | `SQL UPDATE / INSERT Command`                                                               |
@@ -40,7 +40,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | :--- | :--------------------------------------------------------- | :---------------------------- | :-------------------------------------------------------------------- |
 | 2.1  | User submits search parameters.                            | API Gateway                   | `Destination`, `StartDate`, `EndDate`, `GuestCount`, `JWT (Optional)` |
 | 2.2  | Query distributed cache for availability.                  | Hotel Service -> Redis Cache  | `Search Key (Dest + Dates + GuestCount)`                              |
-| 2.3  | **If Cache Miss:** Query SQL database for vacant rooms.    | Hotel Service -> SQL DB       | `SQL SELECT Command (WHERE IsAvailable = true AND Dates overlap)`     |
+| 2.3  | **If Cache Miss:** Query SQL database for vacant rooms.    | Hotel Service -> SQL DB       | `SQL SELECT WHERE IsAvailable = true AND AvailableCount > 0 AND MaxGuests >= guestCount AND dates overlap` |
 | 2.4  | **If Cache Miss:** Populate cache with result set and TTL. | Hotel Service -> Redis Cache  | `Hotel Result Set`                                                    |
 | 2.5  | Evaluate User Auth status for Pricing Strategy.            | Hotel Service                 | `Auth Status (JWT present?)`, `Base Prices`                           |
 | 2.6  | Apply 15% discount if JWT is valid (Strategy Pattern).     | Hotel Service                 | `Auth Status`, `Base Prices` -> `Discounted Prices`                   |
@@ -128,13 +128,13 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 - **Description:** Creates or updates room availability for a given hotel and date range. Sets the room status (vacant/occupied) and available count.
 - **Security:** Authenticated (Admin Role). Requires Bearer JWT.
 - **Precondition:** `StartDate` < `EndDate` AND `AvailableCount` >= 0.
-- **Postcondition:** SQL inventory table updated for the given `HotelId` and date range.
+- **Postcondition:** SQL inventory table updated for the given `HotelId` and date range. On **creation** of a new `InventoryBlock`, `TotalCount` is set to the value of `availableCount` (the admin's "Oda Adedi" input) and remains immutable. On **update** of an existing block, only `AvailableCount` and `IsAvailable` are modified; `TotalCount` is preserved to allow the nightly cron ratio check (`AvailableCount / TotalCount < 0.20`).
   **Request Body:**
 
 ```json
 {
   "hotelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-  "roomType": "Standard",
+  "roomTypeId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "startDate": "2026-06-01T00:00:00Z",
   "endDate": "2026-06-15T00:00:00Z",
   "availableCount": 10,
@@ -147,6 +147,27 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 - `200 OK` — Inventory successfully updated.
 - `400 Bad Request` — Precondition violated (e.g., `StartDate >= EndDate` or negative count).
 - `401 Unauthorized` — Missing or invalid Admin JWT.
+
+---
+
+#### `POST /api/v1/admin/hotels/{hotelId}/roomtypes`
+
+- **Description:** Creates a new room type for a hotel (e.g., "Standard", "Aile"). Required before inventory can be set for that type. Populates the "Oda Tipi" admin dropdown.
+- **Security:** Authenticated (Admin Role).
+- **Request Body:**
+
+```json
+{ "typeName": "Standard", "maxGuests": 2, "basePricePerNight": 8500.00 }
+```
+
+**Responses:** `201 Created` — Room type created. `401 Unauthorized`.
+
+---
+
+#### `GET /api/v1/admin/hotels/{hotelId}/roomtypes`
+
+- **Description:** Lists all room types for a hotel. Used by the admin UI to populate the "Oda Tipi" dropdown before submitting inventory.
+- **Security:** Authenticated (Admin Role).
 
 ---
 
@@ -184,7 +205,8 @@ This document serves as the foundational blueprint for the Hotel Booking System.
       "coordinates": { "lat": 37.034, "lng": 27.43 },
       "pricePerNight": 10948.0,
       "availableRooms": 2,
-      "rating": 9.6
+      "rating": 9.6,
+      "totalReviews": 163
     }
   ]
 }
@@ -224,8 +246,8 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 - **Description:** Creates a reservation. Executes an optimistic concurrency check using the `rowVersion` token to prevent overbooking. On success, decrements capacity in SQL and publishes a `ReservationCreatedEvent` to RabbitMQ.
 - **Security:** Authenticated (User). Requires Bearer JWT.
-- **Precondition:** Valid User JWT AND `rowVersion` token provided AND `StartDate` < `EndDate`.
-- **Postcondition:** `AvailableCount -= 1` in SQL AND `ReservationCreatedEvent` published to RabbitMQ.
+- **Precondition:** Valid User JWT AND `rowVersion` token provided AND `StartDate` < `EndDate` AND `GuestCount` >= 1.
+- **Postcondition:** `AvailableCount -= 1` in `InventoryBlocks` (SQL) AND `Booking` record created in `BookingDbContext` AND `ReservationCreatedEvent` published to RabbitMQ.
   **Request Body:**
 
 ```json

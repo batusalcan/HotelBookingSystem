@@ -70,7 +70,7 @@ These define the high-level structure of the system and are practically required
 ### 6.1 Hotel Admin Feature (Hotel Service — Admin endpoints)
 
 - **Security Scope:** THIS WILL BE AN AUTHENTICATED SERVICE. Only authorized Admin users can access these endpoints.
-- **Inputs:** JSON payload containing `HotelId`, `RoomType`, `StartDate` (DateTime), `EndDate` (DateTime), and `AvailableCount` (Integer).
+- **Inputs:** JSON payload containing `HotelId`, `RoomTypeId` (Guid — references an existing RoomType for this hotel), `StartDate` (DateTime), `EndDate` (DateTime), `AvailableCount` (Integer), and `IsAvailable` (Boolean).
 - **Nice-to-Have Feature:** Image uploading is not necessary but nice-to-have.
 - **Outputs:** HTTP 200 OK or HTTP 400 Bad Request. Updates SQL Database inventory table.
 
@@ -78,6 +78,7 @@ These define the high-level structure of the system and are practically required
 
 - **Security Scope:** Publicly accessible. Users do not need to be logged in to search.
 - **Inputs:** URL Query Parameters: `Destination` (String), `StartDate` (DateTime), `EndDate` (DateTime), `GuestCount` (Integer).
+- **Filtering Rule:** Results must only include `InventoryBlocks` where `IsAvailable = true AND AvailableCount > 0 AND RoomType.MaxGuests >= GuestCount`. The `MaxGuests` check ensures rooms that cannot physically accommodate the requested party are excluded.
 - **Outputs:** Paginated JSON Array of Hotel objects. The UI must explicitly include a 'Haritada goster' (Show on map) feature to display the hotels that have been searched.
 - **Caching Strategy:** The service implements a **cache-aside pattern**. It must query Redis for hotel availability and details first, falling back to query the SQL database only on a cache miss.
 - **Pricing Rule:** Applies a 15% discount algorithm to the output prices if the request header contains a valid user JWT (Client who login to application).
@@ -85,7 +86,7 @@ These define the high-level structure of the system and are practically required
 ### 6.3 Hotel Booking Feature (Hotel Service — Booking endpoints)
 
 - **Security Scope:** Authenticated Service. Users must be logged in to book.
-- **Inputs:** JSON payload: `HotelId`, `RoomId`, `UserId`, `StartDate`, `EndDate`.
+- **Inputs:** JSON payload: `HotelId`, `RoomId`, `UserId` (extracted from JWT `sub` claim), `StartDate`, `EndDate`, `GuestCount` (Integer), `rowVersion` (byte array — required for optimistic concurrency check).
 - **Concurrency Handling:** To prevent overbooking (race conditions), the booking transaction must utilize Optimistic Concurrency Control (e.g., using a `RowVersion` concurrency token in EF Core) to ensure the room's capacity is validated immediately before committing the decrement.
 - **Outputs:** JSON confirmation object. Updates SQL database (decrements capacity). Publishes `ReservationCreatedEvent` (JSON) to RabbitMQ.
 - **Payment:** NO transaction data input is required.
@@ -93,7 +94,7 @@ These define the high-level structure of the system and are practically required
 ### 6.4 Comments Service
 
 - **Inputs:** `HotelId` (Guid).
-- **Outputs:** JSON Array of comment objects and a per-category breakdown graph showing score distributions per service category (e.g., Temizlik, Personel ve servis, İmkân ve özellikler, Çevre dostluğu). Data is retrieved from the NoSQL database.
+- **Outputs:** JSON Array of comment objects and a per-category breakdown graph showing score distributions per service category: Temizlik, Personel ve servis, İmkân ve özellikler, Konaklama yerinin durumu imkânları ve kolaylıkları, Çevre dostluğu (all 5 categories as shown in the PDF mockup). Data is retrieved from the NoSQL database.
 
 ### 6.5 Notification Service (Dual Responsibility)
 
@@ -119,7 +120,19 @@ This service contains two distinct architectural tasks:
 - **Maintainability (2.5):** The system adheres to Microservices and SOLID principles. Independent deployment pipelines and containerization (Docker) ensure any single service can be updated or replaced without affecting the rest of the application.
 - **Versioning & Pagination:** All REST services must be versionable and support pagination when needed.
 
-## 8. Deployment & Deliverables
+## 8. Frontend UI Requirement
+
+- **Requirement:** A working UI is explicitly required by the project definition ("Simple UI implementation per mock-ups given above is required. Front end UIs do not have to be same as shown above. It just needs to work").
+- **Screens required:**
+  - **Search page:** destination, date-range, guest-count inputs + "Haritada göster" map panel
+  - **Search results page:** paginated hotel cards with rating, review count, price (discounted if logged in)
+  - **Hotel detail page:** hotel info + "Rezervasyon yap" booking button + comments/ratings section
+  - **Admin panel:** hotel creation form + room type management + inventory management form (Başlangıç/Bitiş, Oda Tipi dropdown, Oda Adedi, Dolu/Boş)
+  - **AI chat window:** embedded in main application screen
+- **Tech:** Any frontend framework (React recommended). Deployed to cloud (Vercel or Azure Static Web Apps).
+- **Assumption:** Admin panel and main client are implemented as a single React app with role-based routing (Admin role sees admin routes; regular users see search/booking/comments).
+
+## 9. Deployment & Deliverables
 
 - **Deployment:** APIs and UI must be hosted on a cloud service (e.g., Azure App Services, AWS, Google Cloud, Vercel).
 - **Deliverables Required:**
@@ -130,7 +143,7 @@ This service contains two distinct architectural tasks:
     - Data models (e.g., an ER diagram).
   - A link to a short presentation video (max 5 minutes).
 
-## 9. Industry-Standard Enhancements (Portfolio Quality)
+## 10. Industry-Standard Enhancements (Portfolio Quality)
 
 - **Automated Testing & Quality Assurance:** Use `xUnit` for robust unit testing of business logic (e.g., PricingStrategy) and implement basic smoke tests to verify service availability. E2E UI testing is not required.
 - **API Documentation:** Integrate Swagger UI/OpenAPI directly into the **individual microservices** (rather than the API Gateway) to ensure accurate, service-specific contract documentation.
