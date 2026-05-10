@@ -10,12 +10,12 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 | Process ID | Process Name                                 | Description                                                                                                                                               | Primary Actor(s)         | System Components Involved                                                    |
 | :--------- | :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :----------------------- | :---------------------------------------------------------------------------- |
-| **BP-01**  | **Hotel Inventory Management**               | Administrators add or update room capacities and availability status for specific date ranges.                                                            | Hotel Admin              | API Gateway, Hotel Admin Service, SQL Database                                |
-| **BP-02**  | **Hotel Search & Caching**                   | Users query hotel availability. The system implements a cache-aside pattern and applies dynamic pricing based on auth status.                             | User (Guest / Logged-in) | API Gateway, Hotel Search Service, Redis Cache, SQL Database                  |
-| **BP-03**  | **Room Booking & Event-Driven Notification** | Users reserve a room. The system ensures transaction safety via optimistic concurrency, decrements inventory, and asynchronously triggers a notification. | Authenticated User       | API Gateway, Book Hotel Service, SQL Database, RabbitMQ, Notification Service |
-| **BP-04**  | **Comments & Analytics Retrieval**           | Users view textual reviews and aggregated per-category scores for a specific hotel.                                                                       | User                     | API Gateway, Hotel Comments Service, NoSQL Database                           |
-| **BP-05**  | **AI Conversational Booking**                | Users interact with an AI to search and book via natural language, with optional clarifying dialogue and a mandatory 2-step confirmation.                 | Authenticated User       | API Gateway, AI Agent Service, Hotel System Facade, Search/Book Services      |
-| **BP-06**  | **Nightly Capacity Alert**                   | A scheduled cron job evaluates upcoming inventory and alerts admins if capacity drops below 20% for the next month.                                       | System Scheduler (Time)  | Cloud Scheduler, Notification Service, SQL Database                           |
+| **BP-01**  | **Hotel Inventory Management**               | Administrators add or update room capacities and availability status for specific date ranges.                                                            | Hotel Admin              | API Gateway, Hotel Service, SQL Database                                |
+| **BP-02**  | **Hotel Search & Caching**                   | Users query hotel availability. The system implements a cache-aside pattern and applies dynamic pricing based on auth status.                             | User (Guest / Logged-in) | API Gateway, Hotel Service, Redis Cache, SQL Database                  |
+| **BP-03**  | **Room Booking & Event-Driven Notification** | Users reserve a room. The system ensures transaction safety via optimistic concurrency, decrements inventory, and asynchronously triggers a notification. | Authenticated User       | API Gateway, Hotel Service, SQL Database, RabbitMQ, Notification Service |
+| **BP-04**  | **Comments & Analytics Retrieval**           | Users view textual reviews and aggregated per-category scores for a specific hotel.                                                                       | User                     | API Gateway, Comments Service, NoSQL Database                           |
+| **BP-05**  | **AI Conversational Booking**                | Users interact with an AI to search and book via natural language, with optional clarifying dialogue and a mandatory 2-step confirmation.                 | Authenticated User       | API Gateway, AI Agent Service, Hotel System Facade, Hotel Service      |
+| **BP-06**  | **Nightly Capacity Alert**                   | A scheduled cron job evaluates upcoming inventory and alerts admins if capacity drops below 20% for the next month.                                       | System Scheduler (Time)  | Cloud Scheduler, Notification Service, Hotel Service, SQL Database            |
 | **BP-07**  | **Queue-Based Reservation Notification**     | The Notification Service consumes new reservation events from RabbitMQ and dispatches confirmation messages to users.                                     | System (Event-Driven)    | RabbitMQ, Notification Service                                                |
 
 ---
@@ -27,10 +27,10 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | Step | Action                                                                 | System Component              | Required Data (Data Flow)                                                                   |
 | :--- | :--------------------------------------------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------------ |
 | 1.1  | Admin requests to add or update room availability.                     | API Gateway (Ocelot)          | `Admin JWT`, `HotelId`, `RoomType`, `StartDate`, `EndDate`, `AvailableCount`, `IsAvailable` |
-| 1.2  | Gateway validates JWT (Admin role) and routes request.                 | API Gateway -> Admin Service  | `Validated Token`, `Inventory Payload`                                                      |
-| 1.3  | Validate preconditions (`StartDate < EndDate`, `AvailableCount >= 0`). | Hotel Admin Service           | `Inventory Payload`                                                                         |
-| 1.4  | Update or insert inventory records in the database.                    | Hotel Admin Service -> SQL DB | `SQL UPDATE / INSERT Command`                                                               |
-| 1.5  | Return success or validation error to UI.                              | Admin Service -> UI           | `HTTP 200 OK` or `HTTP 400 Bad Request`                                                     |
+| 1.2  | Gateway validates JWT (Admin role) and routes request.                 | API Gateway -> Hotel Service  | `Validated Token`, `Inventory Payload`                                                      |
+| 1.3  | Validate preconditions (`StartDate < EndDate`, `AvailableCount >= 0`). | Hotel Service                 | `Inventory Payload`                                                                         |
+| 1.4  | Update or insert inventory records in the database.                    | Hotel Service -> SQL DB       | `SQL UPDATE / INSERT Command`                                                               |
+| 1.5  | Return success or validation error to UI.                              | Hotel Service -> UI           | `HTTP 200 OK` or `HTTP 400 Bad Request`                                                     |
 
 ---
 
@@ -39,12 +39,12 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | Step | Action                                                     | System Component              | Required Data (Data Flow)                                             |
 | :--- | :--------------------------------------------------------- | :---------------------------- | :-------------------------------------------------------------------- |
 | 2.1  | User submits search parameters.                            | API Gateway                   | `Destination`, `StartDate`, `EndDate`, `GuestCount`, `JWT (Optional)` |
-| 2.2  | Query distributed cache for availability.                  | Search Service -> Redis Cache | `Search Key (Dest + Dates + GuestCount)`                              |
-| 2.3  | **If Cache Miss:** Query SQL database for vacant rooms.    | Search Service -> SQL DB      | `SQL SELECT Command (WHERE IsAvailable = true AND Dates overlap)`     |
-| 2.4  | **If Cache Miss:** Populate cache with result set and TTL. | Search Service -> Redis Cache | `Hotel Result Set`                                                    |
-| 2.5  | Evaluate User Auth status for Pricing Strategy.            | Hotel Search Service          | `Auth Status (JWT present?)`, `Base Prices`                           |
-| 2.6  | Apply 15% discount if JWT is valid (Strategy Pattern).     | Hotel Search Service          | `Auth Status`, `Base Prices` -> `Discounted Prices`                   |
-| 2.7  | Return paginated results (with or without discount).       | Hotel Search Service -> UI    | `Paginated JSON Hotel List` (includes `coordinates` for map)          |
+| 2.2  | Query distributed cache for availability.                  | Hotel Service -> Redis Cache  | `Search Key (Dest + Dates + GuestCount)`                              |
+| 2.3  | **If Cache Miss:** Query SQL database for vacant rooms.    | Hotel Service -> SQL DB       | `SQL SELECT Command (WHERE IsAvailable = true AND Dates overlap)`     |
+| 2.4  | **If Cache Miss:** Populate cache with result set and TTL. | Hotel Service -> Redis Cache  | `Hotel Result Set`                                                    |
+| 2.5  | Evaluate User Auth status for Pricing Strategy.            | Hotel Service                 | `Auth Status (JWT present?)`, `Base Prices`                           |
+| 2.6  | Apply 15% discount if JWT is valid (Strategy Pattern).     | Hotel Service                 | `Auth Status`, `Base Prices` -> `Discounted Prices`                   |
+| 2.7  | Return paginated results (with or without discount).       | Hotel Service -> UI           | `Paginated JSON Hotel List` (includes `coordinates` for map)          |
 
 ---
 
@@ -53,11 +53,11 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | Step | Action                                                                                | System Component                  | Required Data (Data Flow)                                                                 |
 | :--- | :------------------------------------------------------------------------------------ | :-------------------------------- | :---------------------------------------------------------------------------------------- |
 | 3.1  | User submits booking request (with `RowVersion` fetched from prior hotel detail GET). | API Gateway                       | `User JWT`, `HotelId`, `RoomId`, `StartDate`, `EndDate`, `GuestCount`, `RowVersion Token` |
-| 3.2  | Gateway validates JWT and routes to Book Service.                                     | API Gateway -> Book Hotel Service | `Validated Token`, `Booking Payload`                                                      |
-| 3.3  | Execute Optimistic Concurrency check and atomically decrement capacity.               | Book Hotel Service -> SQL DB      | `SQL UPDATE WHERE RowVersion = X`                                                         |
-| 3.4  | **If RowVersion mismatch:** Return 409 Conflict (overbooking prevented).              | Book Hotel Service -> UI          | `HTTP 409 Conflict Response`                                                              |
-| 3.5  | Create and publish `ReservationCreatedEvent` to RabbitMQ.                             | Book Hotel Service -> RabbitMQ    | `ReservationCreatedEvent (JSON)`                                                          |
-| 3.6  | Return immediate booking confirmation to user.                                        | Book Hotel Service -> UI          | `HTTP 200 OK`, `{ bookingId, status: "Confirmed" }`                                       |
+| 3.2  | Gateway validates JWT and routes to Hotel Service.                                    | API Gateway -> Hotel Service      | `Validated Token`, `Booking Payload`                                                      |
+| 3.3  | Execute Optimistic Concurrency check and atomically decrement capacity.               | Hotel Service -> SQL DB           | `SQL UPDATE WHERE RowVersion = X`                                                         |
+| 3.4  | **If RowVersion mismatch:** Return 409 Conflict (overbooking prevented).              | Hotel Service -> UI               | `HTTP 409 Conflict Response`                                                              |
+| 3.5  | Create and publish `ReservationCreatedEvent` to RabbitMQ.                             | Hotel Service -> RabbitMQ         | `ReservationCreatedEvent (JSON)`                                                          |
+| 3.6  | Return immediate booking confirmation to user.                                        | Hotel Service -> UI               | `HTTP 200 OK`, `{ bookingId, status: "Confirmed" }`                                       |
 | 3.7  | Notification Service consumes event from queue.                                       | RabbitMQ -> Notification Service  | `ReservationCreatedEvent (JSON)`                                                          |
 | 3.8  | Dispatch simulated Email/SMS confirmation to user.                                    | Notification Service              | `User Contact Info`, `Booking Details`                                                    |
 
@@ -69,7 +69,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | :--- | :------------------------------------------------------------------------------------------------ | :--------------------------- | :------------------------------------------------------------------ |
 | 4.1  | User requests to view comments for a hotel.                                                       | API Gateway                  | `HotelId`                                                           |
 | 4.2  | Query unstructured review documents from NoSQL database.                                          | Comments Service -> NoSQL DB | `HotelId`                                                           |
-| 4.3  | Aggregate per-category scores (Cleanliness, Staff, Facilities, Location/Condition, Eco-Friendly). | Hotel Comments Service       | `Raw NoSQL Documents`                                               |
+| 4.3  | Aggregate per-category scores (Cleanliness, Staff, Facilities, Location/Condition, Eco-Friendly). | Comments Service             | `Raw NoSQL Documents`                                               |
 | 4.4  | Return paginated comment list and analytics graph data.                                           | Comments Service -> UI       | `JSON Analytics Object` (with `categoryBreakdown` and `comments[]`) |
 
 ---
@@ -81,10 +81,10 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | 5.1  | User submits natural language prompt.                                                                              | API Gateway                        | `User JWT`, `sessionId`, `Text String`                                 |
 | 5.2  | Parse intent and attempt to extract parameters (Destination, Dates, GuestCount).                                   | AI Agent Service                   | `Text String`                                                          |
 | 5.3  | **If parameters incomplete:** Return clarifying question to UI (e.g., "Any preferences for rating or amenities?"). | AI Agent Service -> UI             | `AI Dialogue Response` (`requiresConfirmation: false`)                 |
-| 5.4  | **If parameters complete:** Execute internal hotel search via Facade.                                              | AI Agent Service -> Search Service | `Internal HTTP GET /api/v1/search/hotels`                              |
+| 5.4  | **If parameters complete:** Execute internal hotel search via Facade.                                              | AI Agent Service -> Hotel Service  | `Internal HTTP GET /api/v1/search/hotels`                              |
 | 5.5  | Format search results and present hotel options; ask for booking confirmation.                                     | AI Agent Service -> UI             | `AI Dialogue Response` (`requiresConfirmation: true`, `contextState`)  |
 | 5.6  | User confirms selection ("Yes, book it").                                                                          | UI -> AI Agent Service             | `sessionId`, `userMessage: "Yes, book it"`, `contextState` echoed back |
-| 5.7  | Execute internal room booking via Facade using stored `contextState`.                                              | AI Agent Service -> Book Service   | `Internal HTTP POST /api/v1/bookings`                                  |
+| 5.7  | Execute internal room booking via Facade using stored `contextState`.                                              | AI Agent Service -> Hotel Service  | `Internal HTTP POST /api/v1/bookings`                                  |
 | 5.8  | Return final booking confirmation to user.                                                                         | AI Agent Service -> UI             | `"Your reservation is confirmed!"`                                     |
 
 ---
@@ -93,10 +93,11 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 | Step | Action                                                             | System Component                        | Required Data (Data Flow)                        |
 | :--- | :----------------------------------------------------------------- | :-------------------------------------- | :----------------------------------------------- |
-| 6.1  | Trigger nightly scheduled job.                                     | Cloud Scheduler -> Notification Service | `Cron Trigger Signal`                            |
-| 6.2  | Scan SQL database for upcoming month's hotel inventory.            | Notification Service -> SQL DB          | `SQL Aggregate Query (next 30 days capacity)`    |
-| 6.3  | Identify hotels where available capacity < 20% of total.           | Notification Service                    | `Inventory ResultSet`                            |
-| 6.4  | Dispatch low-capacity warning alert to Admin channels (simulated). | Notification Service                    | `Admin Contact Info`, `HotelId`, `Alert Message` |
+| 6.1  | Trigger nightly scheduled job.                                                    | Cloud Scheduler -> Notification Service           | `Cron Trigger Signal`                                                             |
+| 6.2  | Call Hotel Service internal capacity report endpoint.                             | Notification Service -> Hotel Service             | `GET /api/v1/admin/hotels/capacity-report?days=30`                                |
+| 6.3  | Hotel Service executes SQL aggregate query and returns low-capacity hotel list.   | Hotel Service -> SQL DB -> Notification Service   | `SQL Aggregate Query (next 30 days, AvailableCount/TotalCount < 0.20)`            |
+| 6.4  | Identify hotels where available capacity < 20% of total.                          | Notification Service                              | `Inventory ResultSet (HotelId, HotelName, CapacityRatio, DateRange)`              |
+| 6.5  | Dispatch low-capacity warning alert to Admin channels (simulated).                | Notification Service                              | `Admin Contact Info`, `HotelId`, `Alert Message`                                  |
 
 ---
 
@@ -107,7 +108,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | Step | Action                                                                                       | System Component                 | Required Data (Data Flow)                        |
 | :--- | :------------------------------------------------------------------------------------------- | :------------------------------- | :----------------------------------------------- |
 | 7.1  | Notification Service is subscribed and listening to RabbitMQ queue.                          | Notification Service             | `(Always-on Queue Consumer)`                     |
-| 7.2  | New `ReservationCreatedEvent` arrives on the queue (published by Book Service).              | RabbitMQ -> Notification Service | `ReservationCreatedEvent (JSON)`                 |
+| 7.2  | New `ReservationCreatedEvent` arrives on the queue (published by Hotel Service).             | RabbitMQ -> Notification Service | `ReservationCreatedEvent (JSON)`                 |
 | 7.3  | Deserialize event and extract user and booking details.                                      | Notification Service             | `UserId`, `BookingId`, `HotelId`, `Dates`        |
 | 7.4  | Dispatch reservation confirmation message to user (Email/SMS simulation, logged to console). | Notification Service             | `User Contact Info`, `Booking Confirmation Text` |
 | 7.5  | ACK message on success; NACK and requeue on failure.                                         | Notification Service -> RabbitMQ | `ACK / NACK Signal`                              |
@@ -120,7 +121,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ---
 
-### 1. Hotel Admin Service
+### 1. Hotel Service — Admin
 
 #### `POST /api/v1/admin/inventory`
 
@@ -149,7 +150,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ---
 
-### 2. Hotel Search Service
+### 2. Hotel Service — Search
 
 #### `GET /api/v1/search/hotels`
 
@@ -198,7 +199,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ---
 
-### 3. Book Hotel Service
+### 3. Hotel Service — Booking
 
 #### `GET /api/v1/hotels/{hotelId}/rooms/{roomId}`
 
@@ -251,7 +252,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ---
 
-### 4. Hotel Comments Service
+### 4. Comments Service
 
 #### `GET /api/v1/comments/{hotelId}`
 
@@ -396,7 +397,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ### 6. Internal AMQP Contract (Notification Service — Queue Consumer)
 
-> **Note:** This is not an HTTP endpoint. It documents the message contract consumed by the Notification Service from RabbitMQ, published by the Book Hotel Service.
+> **Note:** This is not an HTTP endpoint. It documents the message contract consumed by the Notification Service from RabbitMQ, published by the Hotel Service.
 
 **Exchange:** `hotel.reservations`
 **Queue:** `reservation.created`

@@ -8,7 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "Hotel Admin Service", Version = "v1" });
+    c.SwaggerDoc("v1", new() { Title = "Hotel Service", Version = "v1" });
     c.AddSecurityDefinition("Bearer", new()
     {
         Name = "Authorization",
@@ -35,7 +35,7 @@ app.UseSerilogRequestLogging();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Admin Service v1"));
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Service v1"));
 }
 
 app.UseHttpsRedirection();

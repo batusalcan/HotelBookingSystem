@@ -30,7 +30,7 @@ These define the high-level structure of the system and are practically required
 
 - **Microservices Architecture:**
   - _Where to use:_ The entire system backend.
-  - _Why:_ The deployment diagram and common requirements explicitly state that the project must be split into separate services. You will have distinct, separate deployments for the Hotel Service, Comments Service, Notification Service, and AI Agent.
+  - _Why:_ The deployment diagram and common requirements explicitly state that the project must be split into separate services. You will have distinct, separate deployments for the **Hotel Service** (handles admin, search, and booking), **Comments Service**, **Notification Service**, and **AI Agent Service**. This matches the professor's deployment diagram which shows a single "Hotel Service" box responsible for all hotel-related operations.
 - **Database-per-Service Pattern:**
   - _Where to use:_ Data persistence layer.
   - _Why:_ To maintain strict microservice boundaries, each service must manage its own data store and EF Core `DbContext`. Services must never share a database or query another service's tables directly.
@@ -47,7 +47,7 @@ These define the high-level structure of the system and are practically required
 ## 5. Design Patterns (GoF) & Code Contracts
 
 - **Strategy Pattern:**
-  - _Where to use:_ Hotel Search Service (Pricing calculation and Search Sorting Algorithm).
+  - _Where to use:_ Hotel Service — search endpoints (Pricing calculation and Search Sorting Algorithm).
   - _Why:_ Swaps pricing calculation logic based on user authentication status (15% discount for logged-in users) and allows dynamic swapping of sorting rules (e.g., sort by price, rating, distance).
   - **\*Note for README/Documentation:** The Strategy pattern was explicitly chosen for pricing to design for future extensibility. This architecture allows the system to easily add new pricing tiers (e.g., VIP memberships, seasonal discounts) later without modifying the core logic.\*
 - **Singleton Pattern:**
@@ -65,14 +65,16 @@ These define the high-level structure of the system and are practically required
 
 ## 6. Functional Requirements & I/O Specifications (1.1, 1.2, 1.4, 1.5)
 
-### 6.1 Hotel Admin Service
+> **Deployment note:** Sections 6.1, 6.2, and 6.3 all describe use cases that are implemented within the single **Hotel Service** deployment. They are separate functional areas (admin, search, booking), but they are NOT separate microservices — they are different controllers within one service, consistent with the professor's deployment diagram.
+
+### 6.1 Hotel Admin Feature (Hotel Service — Admin endpoints)
 
 - **Security Scope:** THIS WILL BE AN AUTHENTICATED SERVICE. Only authorized Admin users can access these endpoints.
 - **Inputs:** JSON payload containing `HotelId`, `RoomType`, `StartDate` (DateTime), `EndDate` (DateTime), and `AvailableCount` (Integer).
 - **Nice-to-Have Feature:** Image uploading is not necessary but nice-to-have.
 - **Outputs:** HTTP 200 OK or HTTP 400 Bad Request. Updates SQL Database inventory table.
 
-### 6.2 Hotel Search Service
+### 6.2 Hotel Search Feature (Hotel Service — Search endpoints)
 
 - **Security Scope:** Publicly accessible. Users do not need to be logged in to search.
 - **Inputs:** URL Query Parameters: `Destination` (String), `StartDate` (DateTime), `EndDate` (DateTime), `GuestCount` (Integer).
@@ -80,7 +82,7 @@ These define the high-level structure of the system and are practically required
 - **Caching Strategy:** The service implements a **cache-aside pattern**. It must query Redis for hotel availability and details first, falling back to query the SQL database only on a cache miss.
 - **Pricing Rule:** Applies a 15% discount algorithm to the output prices if the request header contains a valid user JWT (Client who login to application).
 
-### 6.3 Book Hotel Service
+### 6.3 Hotel Booking Feature (Hotel Service — Booking endpoints)
 
 - **Security Scope:** Authenticated Service. Users must be logged in to book.
 - **Inputs:** JSON payload: `HotelId`, `RoomId`, `UserId`, `StartDate`, `EndDate`.
@@ -88,7 +90,7 @@ These define the high-level structure of the system and are practically required
 - **Outputs:** JSON confirmation object. Updates SQL database (decrements capacity). Publishes `ReservationCreatedEvent` (JSON) to RabbitMQ.
 - **Payment:** NO transaction data input is required.
 
-### 6.4 Hotel Comments Service
+### 6.4 Comments Service
 
 - **Inputs:** `HotelId` (Guid).
 - **Outputs:** JSON Array of comment objects and a per-category breakdown graph showing score distributions per service category (e.g., Temizlik, Personel ve servis, İmkân ve özellikler, Çevre dostluğu). Data is retrieved from the NoSQL database.
@@ -132,7 +134,7 @@ This service contains two distinct architectural tasks:
 
 - **Automated Testing & Quality Assurance:** Use `xUnit` for robust unit testing of business logic (e.g., PricingStrategy) and implement basic smoke tests to verify service availability. E2E UI testing is not required.
 - **API Documentation:** Integrate Swagger UI/OpenAPI directly into the **individual microservices** (rather than the API Gateway) to ensure accurate, service-specific contract documentation.
-- **Distributed Logging:** Implement structured logging (Serilog) with Correlation IDs to trace a single user's request across the Gateway, Search Service, and Queue.
+- **Distributed Logging:** Implement structured logging (Serilog) with Correlation IDs to trace a single user's request across the Gateway, Hotel Service, and Queue.
 - **CI/CD Pipeline:** GitHub Actions workflow to build .NET projects, run unit tests, and seamlessly **execute a `docker build`** to verify that the Dockerfiles compile successfully upon every push.
 - **Database Operations:** Use EF Core Code-First Migrations (ensuring separate `DbContexts` per service) and implement automated data seeding for test hotels/users.
 - **Microservice Health Checks:** Implement `/health` endpoints in all services to verify SQL/Redis connectivity.

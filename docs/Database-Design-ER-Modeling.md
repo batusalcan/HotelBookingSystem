@@ -8,9 +8,9 @@ This document defines the complete data persistence layer for the Hotel Booking 
 
 | Storage Type             | Technology                | Owned By                                | Purpose                                                      |
 | :----------------------- | :------------------------ | :-------------------------------------- | :----------------------------------------------------------- |
-| **Relational SQL**       | Azure SQL Server          | Hotel Admin Service, Book Hotel Service | Transactional data: hotel inventory, room types, bookings    |
-| **NoSQL Document Store** | MongoDB / Azure Cosmos DB | Hotel Comments Service                  | Unstructured review documents and aggregated category scores |
-| **Distributed Cache**    | Redis                     | Hotel Search Service                    | Cached hotel search results with TTL for sub-500ms response  |
+| **Relational SQL**       | Azure SQL Server          | Hotel Service                | Transactional data: hotel inventory, room types, bookings    |
+| **NoSQL Document Store** | MongoDB / Azure Cosmos DB | Comments Service             | Unstructured review documents and aggregated category scores |
+| **Distributed Cache**    | Redis                     | Hotel Service                | Cached hotel search results with TTL for sub-500ms response  |
 
 > **Deployment Note:** The two SQL contexts (`CatalogDbContext` and `BookingDbContext`) can be implemented as separate schemas within the same managed Azure SQL instance (e.g., `catalog` and `booking` schemas) for cost efficiency, or as physically separate databases. They must **never** share EF Core `DbContext` instances or reference each other with hard FK constraints.
 
@@ -18,8 +18,8 @@ This document defines the complete data persistence layer for the Hotel Booking 
 
 ## 2. Bounded Contexts & Ownership
 
-- **Hotel Catalog & Inventory Context** _(Admin Service + Search Service)_: Owns `Hotels`, `RoomTypes`, `InventoryBlocks`. The Search Service reads from this context (via Redis cache or direct SQL query on cache miss). The Admin Service writes to it.
-- **Booking Context** _(Book Hotel Service)_: Owns `Bookings`. References `HotelId` and `RoomTypeId` as soft references (no hard FK constraints across service boundaries).
+- **Hotel Catalog & Inventory Context** _(Hotel Service — `CatalogDbContext`)_: Owns `Hotels`, `RoomTypes`, `InventoryBlocks`. Admin endpoints write; search endpoints read (via Redis cache or direct SQL on cache miss).
+- **Booking Context** _(Hotel Service — `BookingDbContext`)_: Owns `Bookings`. References `HotelId` and `RoomTypeId` as soft references — no hard FK constraints cross DbContext boundaries even though both live in the same service.
 - **Comments Context** _(Comments Service)_: Owns the NoSQL document collection. Completely isolated; communicates no data to SQL services.
 
 ---
@@ -33,7 +33,7 @@ erDiagram
 
     %% ==========================================
     %% CONTEXT A: Hotel Catalog & Inventory
-    %% Owned by: Admin Service / Search Service
+    %% Owned by: Hotel Service (CatalogDbContext)
     %% ==========================================
 
     HOTELS ||--o{ ROOM_TYPES : "has"
@@ -70,7 +70,7 @@ erDiagram
 
     %% ==========================================
     %% CONTEXT B: Reservations
-    %% Owned by: Book Hotel Service
+    %% Owned by: Hotel Service (BookingDbContext)
     %% ==========================================
 
     BOOKINGS {
@@ -97,13 +97,13 @@ erDiagram
 
 #### Table: `Hotels`
 
-The master record for hotel properties. Written by the Admin Service; read by the Search Service.
+The master record for hotel properties. Managed by Hotel Service — admin endpoints write; search endpoints read.
 
 | Column Name   | Data Type          | Constraints                    | Description                                                                                                  |
 | :------------ | :----------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------- |
 | `HotelId`     | `UNIQUEIDENTIFIER` | Primary Key, Default `NEWID()` | Unique identifier for the hotel.                                                                             |
 | `Name`        | `NVARCHAR(100)`    | Not Null                       | Display name, e.g., "Hyde Bodrum - Yetişkin Oteli".                                                          |
-| `Destination` | `NVARCHAR(100)`    | Not Null, **Indexed**          | City/region string used for Search Service destination filtering, e.g., "Bodrum, Muğla".                     |
+| `Destination` | `NVARCHAR(100)`    | Not Null, **Indexed**          | City/region string used for Hotel Service search endpoint destination filtering, e.g., "Bodrum, Muğla".      |
 | `Latitude`    | `DECIMAL(9,6)`     | Not Null                       | Geographic latitude. Required for "Haritada göster" map feature.                                             |
 | `Longitude`   | `DECIMAL(9,6)`     | Not Null                       | Geographic longitude. Required for "Haritada göster" map feature.                                            |
 | `BaseRating`  | `DECIMAL(3,1)`     | Nullable                       | Fallback aggregated rating cached from the Comments Service. Nullable since a new hotel may have no reviews. |
@@ -111,20 +111,20 @@ The master record for hotel properties. Written by the Admin Service; read by th
 
 **Indexes:**
 
-- `IX_Hotels_Destination` on `Destination` — accelerates the most common Search Service `WHERE` clause.
+- `IX_Hotels_Destination` on `Destination` — accelerates the most common Hotel Service search `WHERE` clause.
 
 ---
 
 #### Table: `RoomTypes`
 
-Defines the categories of rooms available within a hotel. Written by the Admin Service.
+Defines the categories of rooms available within a hotel. Managed by Hotel Service (admin endpoints).
 
 | Column Name         | Data Type          | Constraints                               | Description                                                                                                    |
 | :------------------ | :----------------- | :---------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
 | `RoomTypeId`        | `UNIQUEIDENTIFIER` | Primary Key, Default `NEWID()`            | Unique identifier for the room category.                                                                       |
 | `HotelId`           | `UNIQUEIDENTIFIER` | Foreign Key → `Hotels(HotelId)`, Not Null | Links to the owning hotel.                                                                                     |
 | `TypeName`          | `NVARCHAR(50)`     | Not Null                                  | Room category name, e.g., "Standard", "Aile" (Family). Matches the "Oda Tipi" dropdown in the Admin UI mockup. |
-| `MaxGuests`         | `INT`              | Not Null, Check `>= 1`                    | Maximum occupancy. Used by the Search Service to filter results against the `GuestCount` query parameter.      |
+| `MaxGuests`         | `INT`              | Not Null, Check `>= 1`                    | Maximum occupancy. Used by the Hotel Service search endpoint to filter results against the `GuestCount` query parameter. |
 | `BasePricePerNight` | `DECIMAL(18,2)`    | Not Null, Check `> 0`                     | Price before the 15% JWT discount Strategy is applied.                                                         |
 
 ---
@@ -148,7 +148,7 @@ Tracks room availability for specific date ranges. This is the most critical tab
 
 - `IX_InventoryBlocks_StartDate_EndDate` on `(StartDate, EndDate)` — accelerates the date-range overlap query used by Search.
 - `IX_InventoryBlocks_RoomTypeId` on `RoomTypeId` — accelerates joins from `RoomTypes`.
-  **Critical Query (used by Book Hotel Service):**
+  **Critical Query (used by Hotel Service — Booking):**
 
 ```sql
 UPDATE InventoryBlocks
@@ -272,7 +272,7 @@ Each document in the collection represents the full review state for one hotel, 
 ## 6. Redis Cache Schema
 
 **Technology:** Redis (cloud-hosted, e.g., Azure Cache for Redis).
-**Pattern:** Cache-Aside (Lazy Loading). The Search Service checks Redis before querying SQL.
+**Pattern:** Cache-Aside (Lazy Loading). The Hotel Service checks Redis before querying SQL.
 
 ### Key Structure
 
@@ -311,7 +311,7 @@ Each document in the collection represents the full review state for one hotel, 
 
 ### 7.1 Optimistic Concurrency (Overbooking Prevention)
 
-When the Book Hotel Service processes `POST /api/v1/bookings`:
+When the Hotel Service processes `POST /api/v1/bookings`:
 
 1. The client sends the `rowVersion` token it received from `GET /api/v1/hotels/{hotelId}/rooms/{roomId}`.
 2. EF Core executes: `UPDATE InventoryBlocks SET AvailableCount -= 1 WHERE InventoryId = @id AND RowVersion = @rowVersion AND AvailableCount > 0`.
@@ -324,17 +324,16 @@ When the Book Hotel Service processes `POST /api/v1/bookings`:
 
 The `Bookings` table stores `HotelId` and `RoomTypeId` as plain `UNIQUEIDENTIFIER` columns with no SQL `FOREIGN KEY` constraint pointing to the `Hotels` or `RoomTypes` tables. This is intentional:
 
-- The `Bookings` table lives in the `BookingDbContext` (Book Hotel Service).
-- The `Hotels` table lives in the `CatalogDbContext` (Admin/Search Service).
-- In a microservices architecture, services must not share database schemas or enforce cross-service FK constraints — this would create tight coupling and violate the Database-per-Service pattern.
-- Data consistency across services is maintained through the event-driven flow: the `ReservationCreatedEvent` carries all necessary data (HotelId, RoomTypeId, dates) so the Notification Service never needs to query the Catalog DB directly.
+- The `Bookings` table lives in `BookingDbContext`; the `Hotels` table lives in `CatalogDbContext`. Both are owned by the Hotel Service, but they are separate bounded contexts with separate DbContext instances.
+- Even within the same service, cross-DbContext SQL Foreign Keys are not added. Each DbContext is independently migratable and independently connectable to a separate database if needed for future scaling.
+- Data consistency across the booking and notification boundary is maintained through the event-driven flow: the `ReservationCreatedEvent` carries all necessary data (HotelId, RoomTypeId, dates) so the Notification Service never needs to query HotelService's databases directly.
 
 ### 7.3 EF Core Configuration Summary
 
 | DbContext          | Owned By                       | Tables                                   | Migrations Folder                         |
 | :----------------- | :----------------------------- | :--------------------------------------- | :---------------------------------------- |
-| `CatalogDbContext` | Admin Service / Search Service | `Hotels`, `RoomTypes`, `InventoryBlocks` | `/src/HotelService/Migrations/Catalog/`   |
-| `BookingDbContext` | Book Hotel Service             | `Bookings`                               | `/src/BookingService/Migrations/Booking/` |
+| `CatalogDbContext` | Hotel Service | `Hotels`, `RoomTypes`, `InventoryBlocks` | `/src/HotelService/Migrations/Catalog/`  |
+| `BookingDbContext` | Hotel Service | `Bookings`                               | `/src/HotelService/Migrations/Booking/`  |
 
 Each service runs its own `dotnet ef database update` independently. The `RowVersion` column on `InventoryBlocks` must be configured in EF Core as:
 

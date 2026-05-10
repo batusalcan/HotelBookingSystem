@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Claude context file
 CLAUDE.md
+
+# Internal project planning docs
+docs/project-plan.md
