@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="AiAgentService/AiAgentService.csproj" />
+  <Project Path="ApiGateway/ApiGateway.csproj" />
+  <Project Path="BookHotelService/BookHotelService.csproj" />
+  <Project Path="CommentsService/CommentsService.csproj" />
+  <Project Path="HotelAdminService/HotelAdminService.csproj" />
+  <Project Path="HotelSearchService/HotelSearchService.csproj" />
+  <Project Path="NotificationService/NotificationService.csproj" />
+</Solution>
