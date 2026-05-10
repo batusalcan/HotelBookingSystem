@@ -6,4 +6,5 @@
   <Project Path="HotelAdminService/HotelAdminService.csproj" />
   <Project Path="HotelSearchService/HotelSearchService.csproj" />
   <Project Path="NotificationService/NotificationService.csproj" />
+  <Project Path="SharedKernel/SharedKernel.csproj" />
 </Solution>
