@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="backend/AiAgentService/AiAgentService.csproj" />
+  <Project Path="backend/AiAgentService.Tests/AiAgentService.Tests.csproj" />
   <Project Path="backend/ApiGateway/ApiGateway.csproj" />
   <Project Path="backend/CommentsService/CommentsService.csproj" />
   <Project Path="backend/CommentsService.Tests/CommentsService.Tests.csproj" />
