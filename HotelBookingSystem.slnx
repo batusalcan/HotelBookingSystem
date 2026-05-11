@@ -6,5 +6,6 @@
   <Project Path="backend/HotelService/HotelService.csproj" />
   <Project Path="backend/HotelService.Tests/HotelService.Tests.csproj" />
   <Project Path="backend/NotificationService/NotificationService.csproj" />
+  <Project Path="backend/NotificationService.Tests/NotificationService.Tests.csproj" />
   <Project Path="backend/SharedKernel/SharedKernel.csproj" />
 </Solution>
