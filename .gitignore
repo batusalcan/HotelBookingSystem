@@ -486,3 +486,6 @@ CLAUDE.md
 
 # Internal project planning docs
 docs/project-plan.md
+
+# Local development secrets — never commit API keys
+**/appsettings.Development.json
