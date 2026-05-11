@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using SharedKernel.Models;
 
 namespace NotificationService.HttpClients;
 
@@ -10,9 +11,9 @@ public class HotelServiceClient(HttpClient http, ILogger<HotelServiceClient> log
     {
         try
         {
-            var result = await http.GetFromJsonAsync<List<LowCapacityHotelDto>>(
+            var envelope = await http.GetFromJsonAsync<ApiResponse<List<LowCapacityHotelDto>>>(
                 $"/api/v1/admin/hotels/capacity-report?days={days}");
-            return result ?? [];
+            return envelope?.Data ?? [];
         }
         catch (Exception ex)
         {

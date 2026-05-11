@@ -133,6 +133,7 @@ public class InventoryService(CatalogDbContext db, ICacheService cache, ILogger<
             {
                 HotelId = i.RoomType.Hotel.HotelId,
                 HotelName = i.RoomType.Hotel.Name,
+                RoomTypeName = i.RoomType.TypeName,
                 StartDate = i.StartDate,
                 EndDate = i.EndDate,
                 TotalCount = i.TotalCount,

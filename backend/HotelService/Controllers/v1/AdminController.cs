@@ -54,6 +54,7 @@ public class AdminController(IInventoryService inventoryService) : ControllerBas
     }
 
     /// <summary>Internal endpoint for NotificationService nightly cron — not exposed via API Gateway.</summary>
+    [AllowAnonymous]
     [HttpGet("hotels/capacity-report")]
     public async Task<IActionResult> GetCapacityReport([FromQuery] int days = 30)
     {
