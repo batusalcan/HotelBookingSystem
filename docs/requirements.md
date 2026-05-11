@@ -17,6 +17,7 @@
 - **Message Broker:** RabbitMQ or Azure Message Queues.
 - **Scheduler:** Azure App Logic or Google Cloud Scheduler.
 - **Containerization:** A `Dockerfile` must be provided in the source code. _Constraint: Do NOT create/upload the actual Docker image file_.
+- **AI Language Model Provider:** The AI Agent Service must use an external LLM API. The default provider is Google Gemini (`gemini-1.5-flash`). _Constraint: The service must not be tightly coupled to any single provider — the LLM integration must be abstracted behind an `IAiProvider` interface so the underlying model can be swapped (e.g., to GPT-4o or Claude) by changing only the DI registration and config values, with zero changes to business logic._
 
 ## 3. System Interfaces & External Integrations (1.3 & 3.1)
 
@@ -113,6 +114,7 @@ This service contains two distinct architectural tasks:
 - **Inputs:** Natural language text strings from the user via the UI chat window.
 - **Interaction Flow:** Must implement a distinct two-step confirmation flow where the agent first presents options, and then explicitly asks the user to confirm (e.g., "Would you like to confirm your reservation at Hotel Roma Plaza...") before the user confirms ("Yes, book it").
 - **Outputs:** Structured JSON or text responses offering specific hotel options and asking for booking confirmation.
+- **Provider-Agnostic Design (Architectural Requirement):** The LLM integration must be implemented behind an `IAiProvider` abstraction interface with a single method (e.g., `GenerateAsync(prompt)`). The concrete implementation (`GeminiAiProvider`) is registered via dependency injection. The model name and API key must be externalized to configuration (`AI:ModelName`, `AI:ApiKey`) and never hardcoded. Switching to a different LLM provider must require no changes to `AiChatService` or any business logic — only a new `IAiProvider` implementation and a DI registration change.
 
 ## 7. General Non-Functional Requirements (2.1 - 2.5)
 
