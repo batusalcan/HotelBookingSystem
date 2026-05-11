@@ -216,6 +216,8 @@ Records confirmed user reservations. References Hotel and Room data by ID only â
 
 Each document in the collection represents the full review state for one hotel, storing both raw comments and pre-aggregated category scores to avoid expensive recalculation on every read.
 
+> **Architectural Decision / Assumption:** A `POST /api/v1/comments/{hotelId}` endpoint is implemented alongside the standard `GET` endpoint. Although only the display UI is shown in the project mock-ups, the POST endpoint is required to populate this collection with real data. Based on the "verified" and stay-duration labels in the mock-ups, this endpoint is **authenticated** (Bearer JWT via IAM). On each POST, the service appends the new review to `reviews[]` and recalculates `overallScore` and all `categoryScores` in the same document. This will be documented as an assumption in the project README.
+
 ### Document Schema
 
 ```json

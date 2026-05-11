@@ -72,6 +72,17 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | 4.3  | Aggregate per-category scores (Cleanliness, Staff, Facilities, Location/Condition, Eco-Friendly). | Comments Service             | `Raw NoSQL Documents`                                               |
 | 4.4  | Return paginated comment list and analytics graph data.                                           | Comments Service -> UI       | `JSON Analytics Object` (with `categoryBreakdown` and `comments[]`) |
 
+#### BP-04b: Comment Submission (Assumption)
+
+> **Architectural Decision:** Although the project mock-ups only show the comments display UI, a `POST /api/v1/comments/{hotelId}` endpoint is implemented to populate the NoSQL database and maintain dynamic comment data. Based on the "verified" and stay-duration labels in the mock-ups, only authenticated users may submit reviews.
+
+| Step | Action                                                                             | System Component              | Required Data (Data Flow)                                                    |
+| :--- | :--------------------------------------------------------------------------------- | :---------------------------- | :--------------------------------------------------------------------------- |
+| 4b.1 | Authenticated user submits a review for a hotel.                                   | API Gateway                   | `User JWT`, `HotelId`, `rating`, `text`, `categoryRatings`, `tripType`       |
+| 4b.2 | Gateway validates JWT and routes to Comments Service.                              | API Gateway -> Comments Service | `Validated Token`, `Review Payload`                                        |
+| 4b.3 | Comments Service upserts the review document in NoSQL and recalculates aggregates. | Comments Service -> NoSQL DB  | `MongoDB upsert on hotelId document — append to reviews[], update scores`    |
+| 4b.4 | Return confirmation to client.                                                     | Comments Service -> UI        | `HTTP 201 Created`, `{ reviewId }`                                           |
+
 ---
 
 #### BP-05: AI Conversational Booking
@@ -283,6 +294,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 - **Description:** Fetches aggregated per-category review scores and paginated comment text for a specific hotel from NoSQL storage.
 - **Security:** Public.
+
   **Path Parameters:**
 
 | Parameter | Type | Description                        |
@@ -330,6 +342,38 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 - `200 OK` — Comments and analytics returned.
 - `404 Not Found` — No hotel found for the given `hotelId`.
+
+---
+
+#### `POST /api/v1/comments/{hotelId}` _(Assumption — see BP-04b)_
+
+- **Description:** Submits a new review for a hotel. Upserts the NoSQL document for the given hotel, appends the review to the `reviews[]` array, and recalculates the aggregate `overallScore` and all `categoryScores`. This endpoint is not explicitly shown in the project mock-ups but is implemented to populate the NoSQL database and maintain data consistency. The "verified" and stay-duration labels in the mock-ups confirm that only authenticated users should be allowed to post.
+- **Security:** Authenticated (User). Requires Bearer JWT — the IAM service validates the user session before the review is accepted.
+- **Precondition:** Valid JWT AND `hotelId` exists AND `rating` is between 1.0 and 10.0 AND `text` is non-empty.
+- **Postcondition:** Review appended to `reviews[]` in NoSQL document AND `overallScore` and `categoryScores` recalculated.
+
+**Request Body:**
+
+```json
+{
+  "rating": 8.5,
+  "text": "Great location, very clean rooms.",
+  "tripType": "4-night stay",
+  "categoryRatings": {
+    "cleanliness": 9.0,
+    "staff": 8.5,
+    "facilities": 8.0,
+    "locationCondition": 9.0,
+    "ecoFriendly": 8.0
+  }
+}
+```
+
+**Responses:**
+
+- `201 Created` — Review submitted. Returns `{ "reviewId": "rev-uuid-..." }`.
+- `401 Unauthorized` — Missing or invalid JWT.
+- `404 Not Found` — No hotel document found for the given `hotelId`.
 
 ---
 

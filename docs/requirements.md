@@ -93,8 +93,13 @@ These define the high-level structure of the system and are practically required
 
 ### 6.4 Comments Service
 
-- **Inputs:** `HotelId` (Guid).
-- **Outputs:** JSON Array of comment objects and a per-category breakdown graph showing score distributions per service category: Temizlik, Personel ve servis, İmkân ve özellikler, Konaklama yerinin durumu imkânları ve kolaylıkları, Çevre dostluğu (all 5 categories as shown in the PDF mockup). Data is retrieved from the NoSQL database.
+- **GET (Display):** `HotelId` (Guid) as input. Returns a JSON object with per-category breakdown scores and a paginated array of comment objects. Data is retrieved from the NoSQL database. The 5 score categories match the PDF mockup: Temizlik (cleanliness), Personel ve servis (staff), İmkân ve özellikler (facilities), Konaklama yerinin durumu (locationCondition), Çevre dostluğu (ecoFriendly).
+
+- **POST (Submit) — Architectural Decision / Assumption:** Although the project mock-ups only show the comments _display_ UI, we have explicitly decided to implement a `POST /api/v1/comments/{hotelId}` endpoint. This decision is driven by two reasons:
+  1. **Data Consistency:** The endpoint is necessary to populate the NoSQL database with real comment data. Without it, the system can only display seeded/static reviews and has no mechanism for users to submit feedback dynamically.
+  2. **Verified Comments & Security:** The mock-ups show "verified" labels and stay-duration metadata on each comment (e.g., "4 gecelik seyahat"). Based on this, we assume only **authenticated users** (validated via the IAM service JWT) can post comments. This prevents spam and ensures the integrity of the "verified" status. The endpoint validates the JWT Bearer token before accepting any submission, linking the review to the user's confirmed identity.
+
+  > **Note for README:** This is a documented assumption — the POST endpoint is not explicitly required by the project spec but is implemented for system completeness and data integrity. It will be highlighted in the README assumptions section.
 
 ### 6.5 Notification Service (Dual Responsibility)
 
