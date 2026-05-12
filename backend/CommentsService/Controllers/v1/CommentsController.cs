@@ -3,6 +3,7 @@ using CommentsService.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel.Models;
+using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
 namespace CommentsService.Controllers.v1;
@@ -19,8 +20,8 @@ public class CommentsController(IHotelCommentsService commentsService, ILogger<C
     [HttpGet("{hotelId}")]
     public async Task<IActionResult> GetComments(
         string hotelId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 10)
     {
         var result = await commentsService.GetCommentsAsync(hotelId, page, pageSize);
         return Ok(ApiResponse<object>.Ok(result));

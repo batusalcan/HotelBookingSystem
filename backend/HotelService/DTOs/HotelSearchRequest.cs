@@ -4,7 +4,8 @@ namespace HotelService.DTOs;
 
 public class HotelSearchRequest
 {
-    [Required] public string Destination { get; set; } = string.Empty;
+    [Required(AllowEmptyStrings = false), MinLength(1), MaxLength(100)]
+    public string Destination { get; set; } = string.Empty;
     [Required] public DateOnly StartDate { get; set; }
     [Required] public DateOnly EndDate { get; set; }
     [Range(1, 20)] public int GuestCount { get; set; } = 1;
