@@ -17,6 +17,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | **BP-05**  | **AI Conversational Booking**                | Users interact with an AI to search and book via natural language, with optional clarifying dialogue and a mandatory 2-step confirmation.                 | Authenticated User       | API Gateway, AI Agent Service, Hotel System Facade, Hotel Service      |
 | **BP-06**  | **Nightly Capacity Alert**                   | A scheduled cron job evaluates upcoming inventory and alerts admins if capacity drops below 20% for the next month.                                       | System Scheduler (Time)  | Cloud Scheduler, Notification Service, Hotel Service, SQL Database            |
 | **BP-07**  | **Queue-Based Reservation Notification**     | The Notification Service consumes new reservation events from RabbitMQ and dispatches confirmation messages to users.                                     | System (Event-Driven)    | RabbitMQ, Notification Service                                                |
+| **BP-08**  | **User Registration (Sign-Up)**              | A new user creates an account via the IAM provider (Supabase Auth) using the frontend SDK. On success the user is automatically signed in and receives a JWT, unlocking the 15% member discount. _(Assumption — see BP-08 detail below.)_ | Guest User (Unauthenticated) | React Frontend, Supabase Auth (IAM) |
 
 ---
 
@@ -109,6 +110,21 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | 6.3  | Hotel Service executes SQL aggregate query and returns low-capacity hotel list.   | Hotel Service -> SQL DB -> Notification Service   | `SQL Aggregate Query (next 30 days, AvailableCount/TotalCount < 0.20)`            |
 | 6.4  | Identify hotels where available capacity < 20% of total.                          | Notification Service                              | `Inventory ResultSet (HotelId, HotelName, CapacityRatio, DateRange)`              |
 | 6.5  | Dispatch low-capacity warning alert to Admin channels (simulated).                | Notification Service                              | `Admin Contact Info`, `HotelId`, `Alert Message`                                  |
+
+---
+
+#### BP-08: User Registration / Sign-Up (Assumption)
+
+> **Architectural Decision / Assumption:** The project mock-ups do not include a sign-up screen. However, without self-registration a test user cannot obtain a valid JWT, which means the 15% member discount flow and the authenticated booking flow cannot be exercised end-to-end. A Sign-Up page is therefore implemented in the React frontend. Account creation is handled entirely by the IAM provider (Supabase Auth) using the client-side SDK — **no custom registration endpoint exists in any backend service**. This is consistent with the constraint that local auth implementations are strictly forbidden. This assumption will be documented in the project README.
+
+| Step | Action | System Component | Required Data (Data Flow) |
+| :--- | :--------------------------------------------------------------------- | :---------------------------- | :------------------------------------------------------------------------------------------ |
+| 8.1  | Guest navigates to the Sign-Up page and submits email + password. | React Frontend | `email`, `password` (min 6 chars), `confirmPassword` |
+| 8.2  | Frontend validates inputs client-side (passwords match, length). | React Frontend | `form state` |
+| 8.3  | Frontend calls `supabase.auth.signUp({ email, password })` via the Supabase Auth JS SDK. | React Frontend → Supabase Auth | `email`, `password` |
+| 8.4a | **If email confirmation is disabled (Supabase project setting):** Supabase returns an active session immediately. Frontend calls `supabase.auth.signIn()` and redirects user to the home page as an authenticated user. | Supabase Auth → React Frontend | `JWT (access_token)`, `Session` |
+| 8.4b | **If email confirmation is required (Supabase project setting):** Supabase sends a confirmation email. Frontend displays a "Check your email" screen. User clicks the link, confirms account, then navigates to the Sign-In page. | Supabase Auth → User Email → React Frontend | `Confirmation link` |
+| 8.5  | On successful session creation, user JWT is stored in memory and injected as `Authorization: Bearer <token>` on all subsequent API calls via the Axios request interceptor. | React Frontend | `JWT (access_token)` |
 
 ---
 
@@ -381,7 +397,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 #### `POST /api/v1/ai/chat`
 
-- **Description:** Stateless natural language endpoint for the AI chat window. Handles the full conversational booking flow: intent parsing → optional clarifying questions → hotel search → 2-step booking confirmation. State is maintained client-side via the `contextState` field echoed back in each request.
+- **Description:** Stateless natural language endpoint for the AI chat window. Handles the full conversational booking flow: intent parsing → optional clarifying questions → hotel search → 2-step booking confirmation. State is maintained client-side via the `contextState` field echoed back in each request. Full conversation history is sent via `messages[]` so the backend can pass prior turns directly to the LLM (`Gemini contents[]`), giving the AI memory without server-side session storage.
 - **Security:** Authenticated (User). Requires Bearer JWT.
 - **Note:** Real-time messaging is NOT required. Standard HTTP request/response is sufficient.
   **Request Body:**
@@ -390,16 +406,23 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 {
   "sessionId": "sess-abc-123",
   "userMessage": "Find me a hotel in Izmir for next weekend for 2 guests.",
+  "messages": [],
   "contextState": null
 }
 ```
 
-> **Confirmation turn request** (client echoes back `contextState` from previous response):
+> **`messages[]` field:** Array of all prior turns in the conversation (role + content). The frontend appends each user/assistant turn to this array and echoes the full history on every request. The backend passes the array directly to the LLM provider (e.g., Gemini `contents[]`) so the model can reason over the full dialogue. On the first message, `messages` is an empty array.
+
+> **Confirmation turn request** (client echoes back full `messages[]` history + `contextState`):
 
 ```json
 {
   "sessionId": "sess-abc-123",
   "userMessage": "Yes, book it",
+  "messages": [
+    { "role": "user", "content": "Find me a hotel in Izmir for next weekend for 2 guests." },
+    { "role": "assistant", "content": "I found 3 great hotels in Izmir..." }
+  ],
   "contextState": {
     "pendingAction": "BOOK",
     "targetHotelId": "11111111-0000-0000-0000-000000000001",

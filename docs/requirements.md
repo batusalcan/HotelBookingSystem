@@ -106,8 +106,10 @@ These define the high-level structure of the system and are practically required
 
 This service contains two distinct architectural tasks:
 
-- **Task 1 (Event-Driven Queue Consumer):** Subscribes to RabbitMQ. Inputs: AMQP Message for new reservations. Outputs: Pulls new hotel reservations from the queue and sends them a message about reservation details.
+- **Task 1 (Event-Driven Queue Consumer):** Subscribes to RabbitMQ as an always-on `IHostedService`. Inputs: AMQP Message for new reservations. Outputs: Pulls new hotel reservations from the queue and sends them a message about reservation details.
 - **Task 2 (Scheduled Cron Job):** A nightly scheduled task. Inputs: Nightly timer trigger. Outputs: Goes over all hotel capacities and notifies hotel administrators when it is below 20% for the next month.
+
+> **Assumption — Queue Consumer Design:** The project PDF groups both tasks under "write a nightly scheduled task", which could imply a batch-pull pattern for the queue. We have implemented Task 1 as an **always-on AMQP consumer** (ACK/NACK per message) rather than a nightly batch job. This is the correct pattern for RabbitMQ — a batch-pull nightly job would leave booking confirmation messages undelivered for up to 24 hours, which contradicts the system's real-time notification intent. **This assumption will be documented in the project README.**
 
 ### 6.6 AI Agent Service
 
@@ -131,13 +133,17 @@ This service contains two distinct architectural tasks:
 
 - **Requirement:** A working UI is explicitly required by the project definition ("Simple UI implementation per mock-ups given above is required. Front end UIs do not have to be same as shown above. It just needs to work").
 - **Screens required:**
-  - **Search page:** destination, date-range, guest-count inputs + "Haritada göster" map panel
-  - **Search results page:** paginated hotel cards with rating, review count, price (discounted if logged in)
-  - **Hotel detail page:** hotel info + "Rezervasyon yap" booking button + comments/ratings section
+  - **Home / Search page:** destination, date-range, guest-count inputs + "Haritada göster" map panel; hero image with tagline; popular destinations grid; member discount banner
+  - **Search results page:** paginated hotel cards with rating, review count, price (discounted if logged in); sort dropdown; "Show on Map" Leaflet toggle
+  - **Hotel detail page:** hotel info + "Rezervasyon yap" booking button + 15% discount banner if logged in + comments/ratings section
+  - **Booking confirmation page:** booking ID, room type, stay dates, confirmed status badge
   - **Admin panel:** hotel creation form + room type management + inventory management form (Başlangıç/Bitiş, Oda Tipi dropdown, Oda Adedi, Dolu/Boş)
-  - **AI chat window:** embedded in main application screen
-- **Tech:** Any frontend framework (React recommended). Deployed to cloud (Vercel or Azure Static Web Apps).
-- **Assumption:** Admin panel and main client are implemented as a single React app with role-based routing (Admin role sees admin routes; regular users see search/booking/comments).
+  - **AI chat window:** floating widget on all pages (visible only when signed in); calls `POST /gateway/v1/ai/chat`
+  - **Sign-In page:** email + password login via IAM provider (Supabase Auth); links to Sign-Up page
+  - **Sign-Up / Registration page:** email, password, and confirm password inputs; client-side validation (passwords match, min 6 chars); creates account via IAM provider SDK; handles auto-confirm (redirect to home) and email-verification (show "Check your email" screen) flows _(see Assumption below)_
+- **Tech:** React + Vite. All API calls routed through the Ocelot API Gateway (`VITE_GATEWAY_URL`). Deployed to cloud (Vercel or Azure Static Web Apps).
+- **Assumption — Role-based routing:** Admin panel and main client are implemented as a single React app with role-based routing (Admin role sees admin routes; regular users see search/booking/comments).
+- **Assumption — Sign-Up UI:** Although the project mock-ups do not explicitly show a self-registration screen, a Sign-Up page is implemented to make the 15% member discount flow fully demonstrable end-to-end. Without self-registration, a test user cannot obtain a JWT and the discount path cannot be exercised during the demo. Account creation goes directly to the IAM provider (Supabase Auth) — no custom auth code exists in the backend. **This assumption will be documented in the project README.**
 
 ## 9. Deployment & Deliverables
 

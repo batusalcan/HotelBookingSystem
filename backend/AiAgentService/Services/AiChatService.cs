@@ -34,7 +34,7 @@ public class AiChatService(
         }
 
         // Step 2: Parse intent via Gemini
-        var prompt = BuildPrompt(request.UserMessage, request.ContextState);
+        var prompt = BuildPrompt(request.UserMessage, request.ContextState, request.Messages);
         string aiRaw;
         try
         {
@@ -177,7 +177,7 @@ public class AiChatService(
         }
     }
 
-    private static string BuildPrompt(string userMessage, ContextState? context)
+    private static string BuildPrompt(string userMessage, ContextState? context, List<ChatMessage>? history)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
         var sb = new StringBuilder();
@@ -200,6 +200,7 @@ public class AiChatService(
         sb.AppendLine("- Use intent CLARIFY when any required parameter is missing; ask for only the missing ones in reply.");
         sb.AppendLine($"- Today's date is {today}. Calculate exact dates for relative expressions like 'next weekend', 'this Friday'.");
         sb.AppendLine("- Reply in the same language as the user (Turkish or English).");
+        sb.AppendLine("- Use the conversation history below to understand references to previous messages.");
 
         if (context?.PendingAction == "CLARIFY")
         {
@@ -209,6 +210,17 @@ public class AiChatService(
             if (context.StartDate is not null) sb.AppendLine($"- startDate already known: {context.StartDate}");
             if (context.EndDate is not null) sb.AppendLine($"- endDate already known: {context.EndDate}");
             if (context.GuestCount is not null) sb.AppendLine($"- guestCount already known: {context.GuestCount}");
+        }
+
+        if (history is { Count: > 0 })
+        {
+            sb.AppendLine();
+            sb.AppendLine("Conversation history (oldest first):");
+            foreach (var msg in history)
+            {
+                var label = msg.Role == "user" ? "User" : "Assistant";
+                sb.AppendLine($"{label}: {msg.Text}");
+            }
         }
 
         sb.AppendLine();
