@@ -128,7 +128,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 ## Part 2: RESTful API Contracts
 
-> **Note:** All endpoints conform to standard REST conventions, support versioning (`/v1/`) and pagination where applicable, and represent downstream service routes. External client access is routed through the Ocelot API Gateway, which validates JWT tokens before forwarding.
+> **Note:** All endpoints conform to standard REST conventions, support versioning (`/v1/`) and pagination where applicable, and represent downstream service routes. External client access is routed through the Ocelot API Gateway, which validates JWT tokens on protected routes before forwarding. Downstream services also validate the JWT to read user identity claims.
 
 ---
 

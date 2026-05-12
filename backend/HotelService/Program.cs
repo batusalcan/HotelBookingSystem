@@ -111,11 +111,10 @@ app.Use(async (context, next) =>
     }
 });
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Service v1"));
-}
+// UseSwagger must run in all environments — API Gateway SwaggerForOcelot fetches
+// /swagger/v1/swagger.json from each downstream service, including in production.
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Service v1"));
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

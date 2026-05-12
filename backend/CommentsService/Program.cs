@@ -80,11 +80,8 @@ app.Use(async (ctx, next) =>
 
 app.UseSerilogRequestLogging();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Comments Service v1"));
-}
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Comments Service v1"));
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

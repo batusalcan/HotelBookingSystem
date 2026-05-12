@@ -22,7 +22,7 @@
 ## 3. System Interfaces & External Integrations (1.3 & 3.1)
 
 - **Map Integration (External System):** The UI must integrate an external mapping service (e.g., Google Maps API, Mapbox, or Leaflet/OpenStreetMap) to satisfy the "Haritada goster" requirement.
-- **IAM Integration (External System):** Communication with the chosen Identity Provider (e.g., Firebase Auth) will use standard OAuth2/OIDC protocols. The API Gateway will validate JWT Bearer tokens before forwarding requests.
+- **IAM Integration (External System):** Communication with the chosen Identity Provider (e.g., Firebase Auth) will use standard OAuth2/OIDC protocols. Clients authenticate directly with the IAM service and receive a JWT. The API Gateway validates the JWT Bearer token on every protected route before forwarding the request to the downstream service. Downstream services also validate the JWT to read user claims (e.g., `sub` for `UserId`, role for admin checks).
 - **Communication Protocols (1.3):** All internal microservice communication will be strictly RESTful (HTTP/HTTPS) utilizing JSON payloads. Asynchronous communication will utilize AMQP (Advanced Message Queuing Protocol) via RabbitMQ.
 
 ## 4. Architectural Patterns

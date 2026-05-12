@@ -1,0 +1,173 @@
+{
+  "Routes": [
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/admin/inventory",
+      "UpstreamHttpMethod": [ "POST" ],
+      "DownstreamPathTemplate": "/api/v1/admin/inventory",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/admin/hotels",
+      "UpstreamHttpMethod": [ "GET", "POST" ],
+      "DownstreamPathTemplate": "/api/v1/admin/hotels",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/admin/hotels/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT" ],
+      "DownstreamPathTemplate": "/api/v1/admin/hotels/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/search/hotels",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/v1/search/hotels",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "SwaggerKey": "hotelservice",
+      "RateLimitOptions": {
+        "ClientWhitelist": [],
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 100
+      }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/hotels/{everything}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/v1/hotels/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "SwaggerKey": "hotelservice",
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/bookings",
+      "UpstreamHttpMethod": [ "POST" ],
+      "DownstreamPathTemplate": "/api/v1/bookings",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/comments/{hotelId}",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/v1/comments/{hotelId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5223 } ],
+      "SwaggerKey": "commentsservice",
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/comments/{hotelId}",
+      "UpstreamHttpMethod": [ "POST" ],
+      "DownstreamPathTemplate": "/api/v1/comments/{hotelId}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5223 } ],
+      "SwaggerKey": "commentsservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/ai/chat",
+      "UpstreamHttpMethod": [ "POST" ],
+      "DownstreamPathTemplate": "/api/v1/ai/chat",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5160 } ],
+      "SwaggerKey": "aiagentservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": {
+        "ClientWhitelist": [],
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 30
+      }
+    }
+
+  ],
+
+  "SwaggerEndPoints": [
+    {
+      "Key": "hotelservice",
+      "Config": [
+        {
+          "Name": "Hotel Service",
+          "Version": "v1",
+          "Url": "http://localhost:5200/swagger/v1/swagger.json"
+        }
+      ]
+    },
+    {
+      "Key": "commentsservice",
+      "Config": [
+        {
+          "Name": "Comments Service",
+          "Version": "v1",
+          "Url": "http://localhost:5223/swagger/v1/swagger.json"
+        }
+      ]
+    },
+    {
+      "Key": "aiagentservice",
+      "Config": [
+        {
+          "Name": "AI Agent Service",
+          "Version": "v1",
+          "Url": "http://localhost:5160/swagger/v1/swagger.json"
+        }
+      ]
+    }
+  ],
+
+  "GlobalConfiguration": {
+    "BaseUrl": "http://localhost:5158",
+    "RateLimitOptions": {
+      "ClientIdHeader": "X-Client-IP",
+      "QuotaExceededMessage": "Too many requests. Please try again later.",
+      "HttpStatusCode": 429
+    }
+  }
+}
