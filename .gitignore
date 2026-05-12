@@ -489,3 +489,8 @@ docs/project-plan.md
 
 # Local development secrets — never commit API keys
 **/appsettings.Development.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env

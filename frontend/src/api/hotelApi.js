@@ -1,0 +1,32 @@
+import client from './client'
+
+export const searchHotels = (params) =>
+  client.get('/search/hotels', { params })
+
+export const getHotelDetail = (hotelId) =>
+  client.get(`/hotels/${hotelId}`)
+
+export const getRoomDetail = (hotelId, roomTypeId, params) =>
+  client.get(`/hotels/${hotelId}/rooms/${roomTypeId}`, { params })
+
+export const createBooking = (payload) =>
+  client.post('/bookings', payload)
+
+// Admin
+export const adminListHotels = (params) =>
+  client.get('/admin/hotels', { params })
+
+export const adminCreateHotel = (payload) =>
+  client.post('/admin/hotels', payload)
+
+export const adminUpdateHotel = (hotelId, payload) =>
+  client.put(`/admin/hotels/${hotelId}`, payload)
+
+export const adminGetRoomTypes = (hotelId) =>
+  client.get(`/admin/hotels/${hotelId}/roomtypes`)
+
+export const adminCreateRoomType = (hotelId, payload) =>
+  client.post(`/admin/hotels/${hotelId}/roomtypes`, payload)
+
+export const adminUpsertInventory = (payload) =>
+  client.post('/admin/inventory', payload)
