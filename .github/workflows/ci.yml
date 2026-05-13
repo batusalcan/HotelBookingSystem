@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: |
+          dotnet restore backend/SharedKernel/SharedKernel.csproj
+          dotnet restore backend/ApiGateway/ApiGateway.csproj
+          dotnet restore backend/HotelService/HotelService.csproj
+          dotnet restore backend/CommentsService/CommentsService.csproj
+          dotnet restore backend/NotificationService/NotificationService.csproj
+          dotnet restore backend/AiAgentService/AiAgentService.csproj
+          dotnet restore backend/HotelService.Tests/HotelService.Tests.csproj
+          dotnet restore backend/CommentsService.Tests/CommentsService.Tests.csproj
+          dotnet restore backend/NotificationService.Tests/NotificationService.Tests.csproj
+          dotnet restore backend/AiAgentService.Tests/AiAgentService.Tests.csproj
+
+      - name: Build
+        run: |
+          dotnet build backend/SharedKernel/SharedKernel.csproj --no-restore -c Release
+          dotnet build backend/ApiGateway/ApiGateway.csproj --no-restore -c Release
+          dotnet build backend/HotelService/HotelService.csproj --no-restore -c Release
+          dotnet build backend/CommentsService/CommentsService.csproj --no-restore -c Release
+          dotnet build backend/NotificationService/NotificationService.csproj --no-restore -c Release
+          dotnet build backend/AiAgentService/AiAgentService.csproj --no-restore -c Release
+          dotnet build backend/HotelService.Tests/HotelService.Tests.csproj --no-restore -c Release
+          dotnet build backend/CommentsService.Tests/CommentsService.Tests.csproj --no-restore -c Release
+          dotnet build backend/NotificationService.Tests/NotificationService.Tests.csproj --no-restore -c Release
+          dotnet build backend/AiAgentService.Tests/AiAgentService.Tests.csproj --no-restore -c Release
+
+      - name: Test
+        run: |
+          dotnet test backend/HotelService.Tests/HotelService.Tests.csproj --no-build -c Release --logger "trx;LogFileName=results.trx"
+          dotnet test backend/CommentsService.Tests/CommentsService.Tests.csproj --no-build -c Release --logger "trx;LogFileName=results.trx"
+          dotnet test backend/NotificationService.Tests/NotificationService.Tests.csproj --no-build -c Release --logger "trx;LogFileName=results.trx"
+          dotnet test backend/AiAgentService.Tests/AiAgentService.Tests.csproj --no-build -c Release --logger "trx;LogFileName=results.trx"
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+
+    strategy:
+      matrix:
+        include:
+          - service: HotelService
+            tag: hotelservice
+            context: backend/
+            dockerfile: backend/HotelService/Dockerfile
+          - service: CommentsService
+            tag: commentsservice
+            context: backend/
+            dockerfile: backend/CommentsService/Dockerfile
+          - service: NotificationService
+            tag: notificationservice
+            context: backend/
+            dockerfile: backend/NotificationService/Dockerfile
+          - service: AiAgentService
+            tag: aiagentservice
+            context: backend/
+            dockerfile: backend/AiAgentService/Dockerfile
+          - service: ApiGateway
+            tag: apigateway
+            context: backend/
+            dockerfile: backend/ApiGateway/Dockerfile
+          - service: Frontend
+            tag: frontend
+            context: frontend/
+            dockerfile: frontend/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build ${{ matrix.service }} Docker image
+        run: |
+          docker build \
+            -f ${{ matrix.dockerfile }} \
+            ${{ matrix.context }} \
+            -t hotelbooking/${{ matrix.tag }}:ci
