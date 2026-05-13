@@ -486,6 +486,9 @@ $RECYCLE.BIN/
 # Claude context file
 CLAUDE.md
 
+# Claude Code local settings (tool permissions, not secrets, but not shared)
+.claude/settings.local.json
+
 # Internal project planning docs
 docs/project-plan.md
 
