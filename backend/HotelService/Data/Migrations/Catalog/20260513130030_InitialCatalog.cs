@@ -17,15 +17,15 @@ namespace HotelService.Data.Migrations.Catalog
                 name: "Hotels",
                 columns: table => new
                 {
-                    HotelId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Destination = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Latitude = table.Column<decimal>(type: "decimal(9,6)", nullable: false),
-                    Longitude = table.Column<decimal>(type: "decimal(9,6)", nullable: false),
-                    BaseRating = table.Column<decimal>(type: "decimal(3,1)", nullable: true),
-                    TotalReviews = table.Column<int>(type: "int", nullable: false),
-                    ImageUrl = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    HotelId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Destination = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Latitude = table.Column<decimal>(type: "numeric(9,6)", nullable: false),
+                    Longitude = table.Column<decimal>(type: "numeric(9,6)", nullable: false),
+                    BaseRating = table.Column<decimal>(type: "numeric(3,1)", nullable: true),
+                    TotalReviews = table.Column<int>(type: "integer", nullable: false),
+                    ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -36,11 +36,11 @@ namespace HotelService.Data.Migrations.Catalog
                 name: "RoomTypes",
                 columns: table => new
                 {
-                    RoomTypeId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    HotelId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    TypeName = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    MaxGuests = table.Column<int>(type: "int", nullable: false),
-                    BasePricePerNight = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                    RoomTypeId = table.Column<Guid>(type: "uuid", nullable: false),
+                    HotelId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TypeName = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    MaxGuests = table.Column<int>(type: "integer", nullable: false),
+                    BasePricePerNight = table.Column<decimal>(type: "numeric(18,2)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -57,14 +57,14 @@ namespace HotelService.Data.Migrations.Catalog
                 name: "InventoryBlocks",
                 columns: table => new
                 {
-                    InventoryId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    RoomTypeId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    InventoryId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RoomTypeId = table.Column<Guid>(type: "uuid", nullable: false),
                     StartDate = table.Column<DateOnly>(type: "date", nullable: false),
                     EndDate = table.Column<DateOnly>(type: "date", nullable: false),
-                    TotalCount = table.Column<int>(type: "int", nullable: false),
-                    AvailableCount = table.Column<int>(type: "int", nullable: false),
-                    IsAvailable = table.Column<bool>(type: "bit", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "rowversion", rowVersion: true, nullable: false)
+                    TotalCount = table.Column<int>(type: "integer", nullable: false),
+                    AvailableCount = table.Column<int>(type: "integer", nullable: false),
+                    IsAvailable = table.Column<bool>(type: "boolean", nullable: false),
+                    xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>
                 {

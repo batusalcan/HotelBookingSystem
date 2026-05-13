@@ -3,8 +3,8 @@ using System;
 using HotelService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -18,15 +18,15 @@ namespace HotelService.Data.Migrations.Catalog
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "8.0.0")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("HotelService.Entities.Hotel", b =>
                 {
                     b.Property<Guid>("HotelId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("BaseRating")
                         .HasColumnType("decimal(3,1)");
@@ -34,14 +34,14 @@ namespace HotelService.Data.Migrations.Catalog
                     b.Property<string>("Destination")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ImageUrl")
                         .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<decimal>("Latitude")
                         .HasColumnType("decimal(9,6)");
@@ -52,10 +52,10 @@ namespace HotelService.Data.Migrations.Catalog
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<int>("TotalReviews")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("HotelId");
 
@@ -148,31 +148,31 @@ namespace HotelService.Data.Migrations.Catalog
                 {
                     b.Property<Guid>("InventoryId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("AvailableCount")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<DateOnly>("EndDate")
                         .HasColumnType("date");
 
                     b.Property<bool>("IsAvailable")
-                        .HasColumnType("bit");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("RoomTypeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
+                        .HasColumnType("uuid");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
                     b.Property<int>("TotalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
 
                     b.HasKey("InventoryId");
 
@@ -192,7 +192,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000001"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -203,7 +202,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000001"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -214,7 +212,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000001"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -225,7 +222,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000002"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -236,7 +232,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000002"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -247,7 +242,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000002"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -258,7 +252,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000003"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -269,7 +262,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000003"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -280,7 +272,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000003"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -291,7 +282,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000004"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -302,7 +292,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000004"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -313,7 +302,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000004"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -324,7 +312,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000005"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -335,7 +322,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000005"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -346,7 +332,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000005"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -357,7 +342,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000006"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -368,7 +352,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000006"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -379,7 +362,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000006"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -390,7 +372,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000007"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -401,7 +382,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000007"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -412,7 +392,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000007"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -423,7 +402,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000008"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -434,7 +412,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000008"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -445,7 +422,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000008"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -456,7 +432,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000009"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -467,7 +442,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000009"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -478,7 +452,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000009"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -489,7 +462,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000010"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -500,7 +472,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000010"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -511,7 +482,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000010"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -522,7 +492,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000011"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -533,7 +502,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000011"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -544,7 +512,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000011"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -555,7 +522,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000012"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -566,7 +532,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000012"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -577,7 +542,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000012"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -588,7 +552,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000013"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -599,7 +562,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000013"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -610,7 +572,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000013"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         },
@@ -621,7 +582,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 6, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000014"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 5, 10),
                             TotalCount = 10
                         },
@@ -632,7 +592,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 7, 9),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000014"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 6, 9),
                             TotalCount = 10
                         },
@@ -643,7 +602,6 @@ namespace HotelService.Data.Migrations.Catalog
                             EndDate = new DateOnly(2026, 8, 8),
                             IsAvailable = true,
                             RoomTypeId = new Guid("22222222-0000-0000-0000-000000000014"),
-                            RowVersion = new byte[0],
                             StartDate = new DateOnly(2026, 7, 9),
                             TotalCount = 10
                         });
@@ -653,21 +611,21 @@ namespace HotelService.Data.Migrations.Catalog
                 {
                     b.Property<Guid>("RoomTypeId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<decimal>("BasePricePerNight")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<Guid>("HotelId")
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("uuid");
 
                     b.Property<int>("MaxGuests")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("TypeName")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("RoomTypeId");
 

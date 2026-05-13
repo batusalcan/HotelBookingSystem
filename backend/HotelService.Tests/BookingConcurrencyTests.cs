@@ -12,7 +12,7 @@ namespace HotelService.Tests;
 
 /// <summary>
 /// Tests the optimistic concurrency path in BookingService:
-/// when SQL Server increments RowVersion between the client's read and write,
+/// when PostgreSQL increments xmin between the client's read and write,
 /// SaveChangesAsync throws DbUpdateConcurrencyException which must surface as ConflictException.
 /// </summary>
 public class BookingConcurrencyTests
@@ -88,8 +88,7 @@ public class BookingConcurrencyTests
                 EndDate = new DateOnly(2026, 6, 30),
                 TotalCount = 5,
                 AvailableCount = 5,
-                IsAvailable = true,
-                RowVersion = new byte[8]
+                IsAvailable = true
             });
             await seedCtx.SaveChangesAsync();
         }
@@ -110,7 +109,7 @@ public class BookingConcurrencyTests
             StartDate = new DateOnly(2026, 6, 10),
             EndDate = new DateOnly(2026, 6, 15),
             GuestCount = 1,
-            RowVersion = Convert.ToBase64String(new byte[8])
+            RowVersion = 1u
         };
 
         // Precondition guards pass; SaveChanges throws → ConflictException expected

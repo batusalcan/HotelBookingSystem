@@ -8,11 +8,11 @@ This document defines the complete data persistence layer for the Hotel Booking 
 
 | Storage Type             | Technology                | Owned By                                | Purpose                                                      |
 | :----------------------- | :------------------------ | :-------------------------------------- | :----------------------------------------------------------- |
-| **Relational SQL**       | Azure SQL Server          | Hotel Service                | Transactional data: hotel inventory, room types, bookings    |
+| **Relational SQL**       | Supabase PostgreSQL (Npgsql) | Hotel Service             | Transactional data: hotel inventory, room types, bookings    |
 | **NoSQL Document Store** | MongoDB / Azure Cosmos DB | Comments Service             | Unstructured review documents and aggregated category scores |
 | **Distributed Cache**    | Redis                     | Hotel Service                | Cached hotel search results with TTL for sub-500ms response  |
 
-> **Deployment Note:** The two SQL contexts (`CatalogDbContext` and `BookingDbContext`) can be implemented as separate schemas within the same managed Azure SQL instance (e.g., `catalog` and `booking` schemas) for cost efficiency, or as physically separate databases. They must **never** share EF Core `DbContext` instances or reference each other with hard FK constraints.
+> **Deployment Note:** The two SQL contexts (`CatalogDbContext` and `BookingDbContext`) are both connected to Supabase PostgreSQL. They can be implemented as separate schemas (e.g., `catalog` and `booking`) within the same Supabase project for cost efficiency, or as physically separate databases. They must **never** share EF Core `DbContext` instances or reference each other with hard FK constraints. Connection strings use the Npgsql format: `Host=xxx.supabase.co;Database=xxx;Username=postgres;Password=xxx`.
 
 ---
 
@@ -67,7 +67,7 @@ erDiagram
         int TotalCount
         int AvailableCount
         bit IsAvailable
-        timestamp RowVersion
+        xid xmin "PostgreSQL system column — optimistic concurrency token"
     }
 
     %% ==========================================
@@ -146,7 +146,7 @@ Tracks room availability for specific date ranges. This is the most critical tab
 | `TotalCount`     | `INT`                      | Not Null, Check `>= 0`                          | Total physical rooms of this type for this date range. **Set once on creation** to the value of `AvailableCount` from the admin's "Oda Adedi" input; never modified after that. Exists solely to support the nightly cron ratio: `AvailableCount / TotalCount < 0.20`. |
 | `AvailableCount` | `INT`                      | Not Null, Check `>= 0`                          | Currently available rooms. On creation equals `TotalCount`. Decremented atomically during a booking transaction.                                                                   |
 | `IsAvailable`    | `BIT`                      | Not Null, Default `1`                           | Admin-set availability flag. Maps to the "Dolu / Boş" radio button in the Admin UI mockup. Only blocks with `IsAvailable = 1` and `AvailableCount > 0` appear in Search results.   |
-| `RowVersion`     | `ROWVERSION` / `TIMESTAMP` | Not Null, ConcurrencyToken                      | Auto-incremented binary token managed by SQL Server. Used by EF Core for Optimistic Concurrency. The client must send this value back in the `POST /api/v1/bookings` request body. |
+| `xmin`           | `xid` (uint)               | System column, ConcurrencyToken                 | PostgreSQL's built-in transaction ID system column. Auto-incremented by PostgreSQL on every row update. Used by EF Core/Npgsql for Optimistic Concurrency via `UseXminAsConcurrencyToken()`. The client receives the current xmin value as a `uint` from `GET /api/v1/hotels/{hotelId}/rooms/{roomTypeId}` and must send it back in `POST /api/v1/bookings`. Not stored as a regular column — read via `catalogDb.Entry(block).Property<uint>("xmin").CurrentValue`. |
 
 **Indexes:**
 
@@ -155,27 +155,28 @@ Tracks room availability for specific date ranges. This is the most critical tab
   **Critical Query (used by Hotel Service — Booking):**
 
 ```sql
-UPDATE InventoryBlocks
-SET AvailableCount = AvailableCount - 1
-WHERE InventoryId = @inventoryId
-  AND RowVersion = @rowVersion
-  AND AvailableCount > 0;
+-- EF Core/Npgsql generates this automatically using the xmin shadow property:
+UPDATE "InventoryBlocks"
+SET "AvailableCount" = "AvailableCount" - 1
+WHERE "InventoryId" = @inventoryId
+  AND xmin = @xmin
+  AND "AvailableCount" > 0;
 -- If 0 rows affected → EF Core throws DbUpdateConcurrencyException → return HTTP 409 Conflict
 ```
 
 **Critical Query (used by Nightly Cron Job — BP-06):**
 
 ```sql
-SELECT h.HotelId, h.Name, ib.StartDate, ib.EndDate,
-       ib.TotalCount, ib.AvailableCount,
-       CAST(ib.AvailableCount AS FLOAT) / CAST(ib.TotalCount AS FLOAT) AS CapacityRatio
-FROM InventoryBlocks ib
-JOIN RoomTypes rt ON ib.RoomTypeId = rt.RoomTypeId
-JOIN Hotels h ON rt.HotelId = h.HotelId
-WHERE ib.StartDate >= CAST(GETUTCDATE() AS DATE)
-  AND ib.StartDate <= DATEADD(MONTH, 1, CAST(GETUTCDATE() AS DATE))
-  AND ib.TotalCount > 0
-  AND (CAST(ib.AvailableCount AS FLOAT) / CAST(ib.TotalCount AS FLOAT)) < 0.20;
+SELECT h."HotelId", h."Name", ib."StartDate", ib."EndDate",
+       ib."TotalCount", ib."AvailableCount",
+       ib."AvailableCount"::float / ib."TotalCount"::float AS CapacityRatio
+FROM "InventoryBlocks" ib
+JOIN "RoomTypes" rt ON ib."RoomTypeId" = rt."RoomTypeId"
+JOIN "Hotels" h ON rt."HotelId" = h."HotelId"
+WHERE ib."StartDate" >= CURRENT_DATE
+  AND ib."StartDate" <= CURRENT_DATE + INTERVAL '30 days'
+  AND ib."TotalCount" > 0
+  AND (ib."AvailableCount"::float / ib."TotalCount"::float) < 0.20;
 ```
 
 ---
@@ -199,7 +200,7 @@ Records confirmed user reservations. References Hotel and Room data by ID only �
 | `GuestCount`   | `INT`              | Not Null, Check `>= 1`           | Number of guests for the reservation.                                                                                                                                |
 | `TotalAmount`  | `DECIMAL(18,2)`    | Not Null                         | Total price at time of booking. Reflects the 15% discount if the user was authenticated. Stored so the price is immutable even if `BasePricePerNight` changes later. |
 | `Status`       | `NVARCHAR(20)`     | Not Null, Default `'Confirmed'`  | Booking lifecycle state. Valid values: `'Confirmed'`, `'Cancelled'`, `'Completed'`.                                                                                  |
-| `CreatedAt`    | `DATETIME2`        | Not Null, Default `GETUTCDATE()` | UTC timestamp of when the booking was created.                                                                                                                       |
+| `CreatedAt`    | `TIMESTAMPTZ`      | Not Null, Default `NOW()`        | UTC timestamp of when the booking was created.                                                                                                                       |
 
 **Indexes:**
 
@@ -320,9 +321,9 @@ Each document in the collection represents the full review state for one hotel, 
 
 When the Hotel Service processes `POST /api/v1/bookings`:
 
-1. The client sends the `rowVersion` token it received from `GET /api/v1/hotels/{hotelId}/rooms/{roomId}`.
-2. EF Core executes: `UPDATE InventoryBlocks SET AvailableCount -= 1 WHERE InventoryId = @id AND RowVersion = @rowVersion AND AvailableCount > 0`.
-3. If another user booked the same room milliseconds earlier, SQL Server will have auto-incremented `RowVersion`. The `WHERE` clause will match 0 rows.
+1. The client sends the `rowVersion` token (a `uint`) it received from `GET /api/v1/hotels/{hotelId}/rooms/{roomId}`. This value is PostgreSQL's `xmin` system column read from the tracked entity.
+2. EF Core/Npgsql executes: `UPDATE "InventoryBlocks" SET "AvailableCount" = "AvailableCount" - 1 WHERE "InventoryId" = @id AND xmin = @xmin AND "AvailableCount" > 0`.
+3. If another user booked the same room milliseconds earlier, PostgreSQL will have incremented `xmin` on that row. The `WHERE xmin = @xmin` clause will match 0 rows.
 4. EF Core detects 0 affected rows and throws `DbUpdateConcurrencyException`.
 5. The service catches this exception and returns `HTTP 409 Conflict` to the client.
 6. This satisfies the **Definition of Failure** requirement: no booking transaction can leave the system in an inconsistent state (overbooking).
@@ -342,12 +343,22 @@ The `Bookings` table stores `HotelId` and `RoomTypeId` as plain `UNIQUEIDENTIFIE
 | `CatalogDbContext` | Hotel Service | `Hotels`, `RoomTypes`, `InventoryBlocks` | `/src/HotelService/Migrations/Catalog/`  |
 | `BookingDbContext` | Hotel Service | `Bookings`                               | `/src/HotelService/Migrations/Booking/`  |
 
-Each service runs its own `dotnet ef database update` independently. The `RowVersion` column on `InventoryBlocks` must be configured in EF Core as:
+Each service runs its own `dotnet ef database update` independently. The `xmin` optimistic concurrency token on `InventoryBlocks` is configured in EF Core as a shadow property (no CLR property on the entity):
 
 ```csharp
-entity.Property(e => e.RowVersion)
-      .IsRowVersion()
+entity.Property<uint>("xmin")
+      .HasColumnName("xmin")
+      .ValueGeneratedOnAddOrUpdate()
       .IsConcurrencyToken();
+```
+
+At runtime, the service reads and sets the xmin value via:
+```csharp
+// Read (GetRoomDetailAsync — tracked, no AsNoTracking):
+var xmin = catalogDb.Entry(block).Property<uint>("xmin").CurrentValue;
+
+// Write (CreateBookingAsync — set original value before SaveChanges):
+catalogDb.Entry(block).Property<uint>("xmin").OriginalValue = request.RowVersion;
 ```
 
 ### 7.4 Data Seeding Strategy

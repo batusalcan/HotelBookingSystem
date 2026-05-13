@@ -37,9 +37,10 @@ public class BookingService(
         var block = await query
             .OrderBy(i => i.StartDate)
             .Include(i => i.RoomType)
-            .AsNoTracking()
             .FirstOrDefaultAsync()
             ?? throw new NotFoundException($"No available inventory found for room type {roomTypeId} in hotel {hotelId}");
+
+        var xmin = catalogDb.Entry(block).Property<uint>("xmin").CurrentValue;
 
         return new RoomDetailDto
         {
@@ -49,7 +50,7 @@ public class BookingService(
             PricePerNight = block.RoomType.BasePricePerNight,
             AvailableCount = block.AvailableCount,
             InventoryId = block.InventoryId,
-            RowVersion = Convert.ToBase64String(block.RowVersion)
+            RowVersion = xmin
         };
     }
 
@@ -72,8 +73,6 @@ public class BookingService(
         if (request.GuestCount < 1)
             throw new AppException("GuestCount must be at least 1", 400);
 
-        var rowVersionBytes = Convert.FromBase64String(request.RowVersion);
-
         var block = await catalogDb.InventoryBlocks
             .Include(i => i.RoomType).ThenInclude(r => r.Hotel)
             .FirstOrDefaultAsync(i => i.InventoryId == request.InventoryId)
@@ -85,8 +84,8 @@ public class BookingService(
                 $"Requested dates ({request.StartDate} – {request.EndDate}) are not covered by inventory block " +
                 $"(valid {block.StartDate} – {block.EndDate})", 400);
 
-        // Attach with the client-provided RowVersion — EF Core will fail on mismatch
-        catalogDb.Entry(block).Property(i => i.RowVersion).OriginalValue = rowVersionBytes;
+        // Set the client-provided xmin as original value — EF Core/Npgsql will include it in WHERE clause
+        catalogDb.Entry(block).Property<uint>("xmin").OriginalValue = request.RowVersion;
 
         block.AvailableCount -= 1;
         if (block.AvailableCount == 0) block.IsAvailable = false;

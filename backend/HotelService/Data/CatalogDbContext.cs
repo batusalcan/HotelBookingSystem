@@ -37,7 +37,7 @@ public class CatalogDbContext(DbContextOptions<CatalogDbContext> options) : DbCo
         modelBuilder.Entity<InventoryBlock>(e =>
         {
             e.HasKey(i => i.InventoryId);
-            e.Property(i => i.RowVersion).IsRowVersion().IsConcurrencyToken();
+            e.Property<uint>("xmin").HasColumnName("xmin").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
             e.HasIndex(i => new { i.StartDate, i.EndDate }).HasDatabaseName("IX_InventoryBlocks_StartDate_EndDate");
             e.HasIndex(i => i.RoomTypeId).HasDatabaseName("IX_InventoryBlocks_RoomTypeId");
             e.HasOne(i => i.RoomType)

@@ -48,7 +48,7 @@ public class AiChatServiceTests
             => Task.FromResult(new RoomDetailDto
             {
                 InventoryId = Guid.NewGuid(),
-                RowVersion = "AAAAAAAA"
+                RowVersion = 1u
             });
 
         public Task<BookingResultDto> BookRoomAsync(ContextState contextState, string authToken)
@@ -110,7 +110,7 @@ public class AiChatServiceTests
                 StartDate = "2026-07-01",
                 EndDate = "2026-07-05",
                 GuestCount = 2,
-                RowVersion = "AAAAAAAA",
+                RowVersion = 1u,
                 HotelName = "Test Hotel"
             }
         };

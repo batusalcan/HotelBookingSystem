@@ -8,5 +8,5 @@ public class RoomDetailDto
     public decimal PricePerNight { get; set; }
     public int AvailableCount { get; set; }
     public Guid InventoryId { get; set; }
-    public string RowVersion { get; set; } = string.Empty;
+    public uint RowVersion { get; set; }
 }

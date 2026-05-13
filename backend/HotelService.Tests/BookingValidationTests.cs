@@ -20,7 +20,7 @@ public class BookingValidationTests
             StartDate = new DateOnly(2026, 6, 1),
             EndDate = new DateOnly(2026, 6, 1),
             GuestCount = 1,
-            RowVersion = Convert.ToBase64String(new byte[8])
+            RowVersion = 1u
         };
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
@@ -41,7 +41,7 @@ public class BookingValidationTests
             StartDate = new DateOnly(2026, 6, 5),
             EndDate = new DateOnly(2026, 6, 1),
             GuestCount = 1,
-            RowVersion = Convert.ToBase64String(new byte[8])
+            RowVersion = 1u
         };
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>
@@ -61,7 +61,7 @@ public class BookingValidationTests
             StartDate = new DateOnly(2026, 6, 1),
             EndDate = new DateOnly(2026, 6, 5),
             GuestCount = 0,
-            RowVersion = Convert.ToBase64String(new byte[8])
+            RowVersion = 1u
         };
 
         var ex = await Assert.ThrowsAsync<AppException>(() =>

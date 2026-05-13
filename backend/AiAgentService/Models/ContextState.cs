@@ -29,7 +29,7 @@ public class ContextState
     public Guid? TargetInventoryId { get; set; }
 
     [JsonPropertyName("rowVersion")]
-    public string? RowVersion { get; set; }
+    public uint? RowVersion { get; set; }
 
     [JsonPropertyName("hotelName")]
     public string? HotelName { get; set; }

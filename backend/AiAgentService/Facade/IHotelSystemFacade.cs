@@ -22,7 +22,7 @@ public interface IHotelSystemFacade
 public class RoomDetailDto
 {
     public Guid InventoryId { get; set; }
-    public string RowVersion { get; set; } = string.Empty;
+    public uint RowVersion { get; set; }
 }
 
 public class BookingResultDto

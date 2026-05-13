@@ -118,7 +118,7 @@ public class HotelSystemFacade(HttpClient http, ILogger<HotelSystemFacade> logge
 
     private record RoomDetailResponseDto(
         [property: JsonPropertyName("inventoryId")] Guid InventoryId,
-        [property: JsonPropertyName("rowVersion")] string RowVersion);
+        [property: JsonPropertyName("rowVersion")] uint RowVersion);
 
     private record BookingConfirmationDto(
         [property: JsonPropertyName("bookingId")] Guid BookingId,

@@ -11,7 +11,7 @@
 - **Backend Framework:** C# .NET Core Web API
 - **API Gateway:** Ocelot (or similar .NET Gateway)
 - **Authentication (IAM):** Third-party Identity Provider (AWS Cognito, Firebase Auth, or Supabase Auth). _Constraint: Local, custom authentication implementations are strictly forbidden_.
-- **Relational Database:** Cloud-hosted SQL (e.g., Azure SQL Server) for transactional data. _Constraint: SQLite is strictly forbidden_.
+- **Relational Database:** Supabase PostgreSQL for transactional data. _Constraint: SQLite is strictly forbidden. Implementation uses Npgsql EF Core provider; xmin system column replaces SQL Server ROWVERSION for optimistic concurrency._
 - **NoSQL Database:** MongoDB or Azure Cosmos DB for unstructured data (Comments).
 - **Distributed Cache:** Redis (or in-memory).
 - **Message Broker:** RabbitMQ or Azure Message Queues.
@@ -87,7 +87,7 @@ These define the high-level structure of the system and are practically required
 ### 6.3 Hotel Booking Feature (Hotel Service — Booking endpoints)
 
 - **Security Scope:** Authenticated Service. Users must be logged in to book.
-- **Inputs:** JSON payload: `HotelId`, `RoomId`, `UserId` (extracted from JWT `sub` claim), `StartDate`, `EndDate`, `GuestCount` (Integer), `rowVersion` (byte array — required for optimistic concurrency check).
+- **Inputs:** JSON payload: `HotelId`, `RoomId`, `UserId` (extracted from JWT `sub` claim), `StartDate`, `EndDate`, `GuestCount` (Integer), `rowVersion` (uint — PostgreSQL xmin value, required for optimistic concurrency check).
 - **Concurrency Handling:** To prevent overbooking (race conditions), the booking transaction must utilize Optimistic Concurrency Control (e.g., using a `RowVersion` concurrency token in EF Core) to ensure the room's capacity is validated immediately before committing the decrement.
 - **Outputs:** JSON confirmation object. Updates SQL database (decrements capacity). Publishes `ReservationCreatedEvent` (JSON) to RabbitMQ.
 - **Payment:** NO transaction data input is required.

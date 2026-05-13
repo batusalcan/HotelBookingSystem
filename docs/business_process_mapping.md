@@ -265,7 +265,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
   "pricePerNight": 350.0,
   "availableCount": 10,
   "inventoryId": "33333333-0000-0000-0000-000000000001",
-  "rowVersion": "AAAAAAAAAAA="
+  "rowVersion": 3628514
 }
 ```
 
@@ -287,7 +287,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
   "startDate": "2026-05-15",
   "endDate": "2026-05-20",
   "guestCount": 2,
-  "rowVersion": "AAAAAAAAAAA="
+  "rowVersion": 3628514
 }
 ```
 
@@ -431,7 +431,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
     "startDate": "2026-05-16",
     "endDate": "2026-05-18",
     "guestCount": 2,
-    "rowVersion": "AAAAAAAAAAA="
+    "rowVersion": 3628514
   }
 }
 ```
@@ -466,7 +466,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
     "startDate": "2026-05-16",
     "endDate": "2026-05-18",
     "guestCount": 2,
-    "rowVersion": "AAAAAAAAAAA="
+    "rowVersion": 3628514
   }
 }
 ```

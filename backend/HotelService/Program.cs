@@ -16,10 +16,10 @@ builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configurati
 
 // ── DbContexts ────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<CatalogDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("CatalogDb")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("CatalogDb")));
 
 builder.Services.AddDbContext<BookingDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("BookingDb")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("BookingDb")));
 
 // ── Redis (Singleton) ─────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
