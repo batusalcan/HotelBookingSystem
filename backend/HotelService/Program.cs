@@ -33,6 +33,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
     var connStr = builder.Configuration.GetConnectionString("Redis")!;
     var options = ConfigurationOptions.Parse(connStr);
     options.AbortOnConnectFail = false;
+    options.ConnectTimeout = 1000;
+    options.SyncTimeout = 2000;
     return ConnectionMultiplexer.Connect(options);
 });
 builder.Services.AddScoped<ICacheService, RedisCacheService>();
