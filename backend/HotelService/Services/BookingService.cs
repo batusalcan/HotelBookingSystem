@@ -5,6 +5,8 @@ using HotelService.Entities;
 using HotelService.Messaging;
 using HotelService.Pricing;
 using Microsoft.EntityFrameworkCore;
+using Polly;
+using Polly.CircuitBreaker;
 using SharedKernel.Events;
 using SharedKernel.Exceptions;
 
@@ -14,7 +16,8 @@ public class BookingService(
     CatalogDbContext catalogDb,
     BookingDbContext bookingDb,
     IRabbitMqPublisher publisher,
-    ILogger<BookingService> logger) : IBookingService
+    ILogger<BookingService> logger,
+    [FromKeyedServices("sql")] ResiliencePipeline? sqlPipeline = null) : IBookingService
 {
     /// <precondition>Hotel with hotelId exists; RoomType with roomTypeId belongs to that hotel</precondition>
     /// <postcondition>Returns RoomDetailDto with current RowVersion token for optimistic concurrency.
@@ -90,14 +93,20 @@ public class BookingService(
         block.AvailableCount -= 1;
         if (block.AvailableCount == 0) block.IsAvailable = false;
 
+        var pipeline = sqlPipeline ?? ResiliencePipeline.Empty;
         try
         {
-            await catalogDb.SaveChangesAsync();
+            await pipeline.ExecuteAsync(async ct => await catalogDb.SaveChangesAsync(ct));
         }
         catch (DbUpdateConcurrencyException)
         {
             logger.LogWarning("Optimistic concurrency conflict for InventoryId={InventoryId}", request.InventoryId);
             throw new ConflictException("Room capacity changed since you last viewed it. Please refresh and try again.");
+        }
+        catch (BrokenCircuitException)
+        {
+            logger.LogError("SQL circuit breaker open — booking aborted for InventoryId={InventoryId}", request.InventoryId);
+            throw new AppException("Database is temporarily unavailable. Please try again later.", 503);
         }
 
         IPricingStrategy pricing = isAuthenticated ? new AuthenticatedPricingStrategy() : new GuestPricingStrategy();
@@ -116,7 +125,15 @@ public class BookingService(
         };
 
         bookingDb.Bookings.Add(booking);
-        await bookingDb.SaveChangesAsync();
+        try
+        {
+            await pipeline.ExecuteAsync(async ct => await bookingDb.SaveChangesAsync(ct));
+        }
+        catch (BrokenCircuitException)
+        {
+            logger.LogError("SQL circuit breaker open — booking record not saved for BookingId={BookingId}", booking.BookingId);
+            throw new AppException("Database is temporarily unavailable. Please try again later.", 503);
+        }
 
         var evt = new ReservationCreatedEvent
         {

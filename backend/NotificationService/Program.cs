@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using NotificationService.Health;
 using NotificationService.HttpClients;
 using NotificationService.Jobs;
 using NotificationService.Messaging;
 using NotificationService.Services;
 using Serilog;
+using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +16,8 @@ builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configurati
 builder.Services.AddHttpClient<IHotelServiceClient, HotelServiceClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["HotelService:BaseUrl"] ?? "http://localhost:5001");
-});
+})
+.AddStandardResilienceHandler();
 
 // Factory Method Pattern — concrete notification types registered as transient
 builder.Services.AddTransient<BookingConfirmationNotification>();
@@ -32,9 +37,24 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "Notification Service", Version = "v1" }));
 
-builder.Services.AddHealthChecks();
+// ── Health checks — RabbitMQ connectivity ─────────────────────────────────────
+builder.Services.AddHealthChecks()
+    .AddCheck<RabbitMqHealthCheck>(
+        name: "rabbitmq",
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["messaging"]);
 
 var app = builder.Build();
+
+// ── Correlation ID middleware — must come BEFORE UseSerilogRequestLogging ────────
+app.Use(async (ctx, next) =>
+{
+    var correlationId = ctx.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+        ?? Guid.NewGuid().ToString("N");
+    ctx.Response.Headers["X-Correlation-Id"] = correlationId;
+    using (LogContext.PushProperty("CorrelationId", correlationId))
+        await next();
+});
 
 app.UseSerilogRequestLogging();
 
@@ -65,6 +85,19 @@ app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Notificatio
 
 app.UseHttpsRedirection();
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (ctx, report) =>
+    {
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() })
+        });
+    }
+});
 
 app.Run();
+
+public partial class Program { }

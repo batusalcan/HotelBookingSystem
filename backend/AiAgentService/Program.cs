@@ -2,7 +2,9 @@ using AiAgentService.Facade;
 using AiAgentService.Providers;
 using AiAgentService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Serilog;
+using Serilog.Context;
 using SharedKernel.Exceptions;
 using SharedKernel.Models;
 
@@ -11,13 +13,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration));
 
 // ── AI Provider (swap here to change LLM — zero business logic change required) ──
-builder.Services.AddHttpClient<IAiProvider, GeminiAiProvider>();
+builder.Services.AddHttpClient<IAiProvider, GeminiAiProvider>()
+    .AddStandardResilienceHandler();
 
 // ── Hotel System Facade (typed HttpClient → HotelService) ────────────────────
 builder.Services.AddHttpClient<IHotelSystemFacade, HotelSystemFacade>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["ServiceUrls:HotelService"] ?? "http://localhost:5001");
-});
+})
+.AddStandardResilienceHandler();
 
 // ── Application services ──────────────────────────────────────────────────────
 builder.Services.AddScoped<IAiChatService, AiChatService>();
@@ -64,9 +68,19 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks(); // liveness only — no external DB
 
 var app = builder.Build();
+
+// ── Correlation ID middleware — must come BEFORE UseSerilogRequestLogging ────────
+app.Use(async (ctx, next) =>
+{
+    var correlationId = ctx.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+        ?? Guid.NewGuid().ToString("N");
+    ctx.Response.Headers["X-Correlation-Id"] = correlationId;
+    using (LogContext.PushProperty("CorrelationId", correlationId))
+        await next();
+});
 
 app.UseSerilogRequestLogging();
 
@@ -97,6 +111,19 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (ctx, report) =>
+    {
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() })
+        });
+    }
+});
 
 app.Run();
+
+public partial class Program { }

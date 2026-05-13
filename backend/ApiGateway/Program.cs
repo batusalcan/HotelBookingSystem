@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using Serilog;
+using Serilog.Context;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,8 +51,6 @@ var app = builder.Build();
 // Unwrap X-Forwarded-For so RemoteIpAddress reflects the real client IP
 app.UseForwardedHeaders();
 
-app.UseSerilogRequestLogging();
-
 // Copy real client IP into X-Client-IP — Ocelot rate limiter reads this header
 app.Use((context, next) =>
 {
@@ -58,6 +58,20 @@ app.Use((context, next) =>
     context.Request.Headers["X-Client-IP"] = clientIp;
     return next();
 });
+
+// Correlation ID — generate if missing, forward to downstream services via request header.
+// Must come BEFORE UseSerilogRequestLogging so the request log line includes CorrelationId.
+app.Use(async (ctx, next) =>
+{
+    var correlationId = ctx.Request.Headers["X-Correlation-Id"].FirstOrDefault()
+        ?? Guid.NewGuid().ToString("N");
+    ctx.Request.Headers["X-Correlation-Id"] = correlationId;
+    ctx.Response.Headers["X-Correlation-Id"] = correlationId;
+    using (LogContext.PushProperty("CorrelationId", correlationId))
+        await next();
+});
+
+app.UseSerilogRequestLogging();
 
 // Authentication and authorization must run before Ocelot so that routes
 // with AuthenticationOptions can call context.AuthenticateAsync("Bearer").
@@ -70,7 +84,18 @@ app.UseSwaggerForOcelotUI(opt =>
     opt.PathToSwaggerGenerator = "/swagger/docs";
 });
 
-app.MapHealthChecks("/health");
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (ctx, report) =>
+    {
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() })
+        });
+    }
+});
 
 await app.UseOcelot();
 

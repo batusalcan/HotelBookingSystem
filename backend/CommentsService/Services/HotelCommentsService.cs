@@ -2,11 +2,16 @@ using CommentsService.Data;
 using CommentsService.DTOs;
 using CommentsService.Models;
 using MongoDB.Driver;
+using Polly;
+using Polly.CircuitBreaker;
 using SharedKernel.Exceptions;
 
 namespace CommentsService.Services;
 
-public class HotelCommentsService(MongoDbContext db, ILogger<HotelCommentsService> logger) : IHotelCommentsService
+public class HotelCommentsService(
+    MongoDbContext db,
+    ILogger<HotelCommentsService> logger,
+    [FromKeyedServices("mongo")] ResiliencePipeline mongoPipeline) : IHotelCommentsService
 {
     /// <summary>
     /// Gets paginated comments for a hotel.
@@ -19,10 +24,20 @@ public class HotelCommentsService(MongoDbContext db, ILogger<HotelCommentsServic
         if (page < 1) throw new AppException("Page must be >= 1.");
         if (pageSize < 1 || pageSize > 100) throw new AppException("PageSize must be between 1 and 100.");
 
-        var document = await db.HotelReviews
-            .Find(h => h.HotelId == hotelId)
-            .FirstOrDefaultAsync()
-            ?? throw new NotFoundException($"No reviews found for hotel '{hotelId}'.");
+        var pipeline = mongoPipeline;
+        HotelReview? document;
+        try
+        {
+            document = await pipeline.ExecuteAsync(async ct =>
+                await db.HotelReviews.Find(h => h.HotelId == hotelId).FirstOrDefaultAsync(ct));
+        }
+        catch (BrokenCircuitException)
+        {
+            logger.LogError("MongoDB circuit breaker open — aborting GetComments for hotel {HotelId}", hotelId);
+            throw new AppException("Database is temporarily unavailable. Please try again later.", 503);
+        }
+
+        if (document is null) throw new NotFoundException($"No reviews found for hotel '{hotelId}'.");
 
         var totalReviews = document.Reviews.Count;
         var comments = document.Reviews
@@ -87,29 +102,44 @@ public class HotelCommentsService(MongoDbContext db, ILogger<HotelCommentsServic
             Date = DateTime.UtcNow
         };
 
-        var document = await db.HotelReviews
-            .Find(h => h.HotelId == hotelId)
-            .FirstOrDefaultAsync();
-
-        if (document is null)
+        HotelReview? document;
+        try
         {
-            document = new HotelReview
-            {
-                HotelId = hotelId,
-                Reviews = [newEntry],
-                TotalReviews = 1,
-                OverallScore = newEntry.Rating,
-                CategoryScores = newEntry.CategoryRatings
-            };
-            await db.HotelReviews.InsertOneAsync(document);
-            logger.LogInformation("Created new review document for hotel {HotelId}", hotelId);
+            document = await mongoPipeline.ExecuteAsync(async ct =>
+                await db.HotelReviews.Find(h => h.HotelId == hotelId).FirstOrDefaultAsync(ct));
         }
-        else
+        catch (BrokenCircuitException)
         {
-            document.Reviews.Add(newEntry);
-            Recalculate(document);
-            await db.HotelReviews.ReplaceOneAsync(h => h.HotelId == hotelId, document);
-            logger.LogInformation("Appended review to hotel {HotelId}; new total {Total}", hotelId, document.TotalReviews);
+            logger.LogError("MongoDB circuit breaker open — aborting AddComment read for hotel {HotelId}", hotelId);
+            throw new AppException("Database is temporarily unavailable. Please try again later.", 503);
+        }
+        try
+        {
+            if (document is null)
+            {
+                document = new HotelReview
+                {
+                    HotelId = hotelId,
+                    Reviews = [newEntry],
+                    TotalReviews = 1,
+                    OverallScore = newEntry.Rating,
+                    CategoryScores = newEntry.CategoryRatings
+                };
+                await mongoPipeline.ExecuteAsync(async ct => await db.HotelReviews.InsertOneAsync(document, cancellationToken: ct));
+                logger.LogInformation("Created new review document for hotel {HotelId}", hotelId);
+            }
+            else
+            {
+                document.Reviews.Add(newEntry);
+                Recalculate(document);
+                await mongoPipeline.ExecuteAsync(async ct => await db.HotelReviews.ReplaceOneAsync(h => h.HotelId == hotelId, document, cancellationToken: ct));
+                logger.LogInformation("Appended review to hotel {HotelId}; new total {Total}", hotelId, document.TotalReviews);
+            }
+        }
+        catch (BrokenCircuitException)
+        {
+            logger.LogError("MongoDB circuit breaker open — aborting AddComment for hotel {HotelId}", hotelId);
+            throw new AppException("Database is temporarily unavailable. Please try again later.", 503);
         }
 
         return newEntry;

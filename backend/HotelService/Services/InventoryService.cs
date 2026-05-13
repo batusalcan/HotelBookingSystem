@@ -3,13 +3,33 @@ using HotelService.Data;
 using HotelService.DTOs;
 using HotelService.Entities;
 using Microsoft.EntityFrameworkCore;
+using Polly;
+using Polly.CircuitBreaker;
 using SharedKernel.Exceptions;
 
 namespace HotelService.Services;
 
-public class InventoryService(CatalogDbContext db, ICacheService cache, ILogger<InventoryService> logger)
-    : IInventoryService
+public class InventoryService(
+    CatalogDbContext db,
+    ICacheService cache,
+    ILogger<InventoryService> logger,
+    [FromKeyedServices("sql")] ResiliencePipeline? sqlPipeline = null) : IInventoryService
 {
+    private ResiliencePipeline Pipeline => sqlPipeline ?? ResiliencePipeline.Empty;
+
+    private async Task SaveAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            await Pipeline.ExecuteAsync(async token => await db.SaveChangesAsync(token), ct);
+        }
+        catch (BrokenCircuitException)
+        {
+            logger.LogError("SQL circuit breaker open — write aborted");
+            throw new AppException("Database is temporarily unavailable. Please try again later.", 503);
+        }
+    }
+
     /// <precondition>request.Name and request.Destination are non-empty strings</precondition>
     /// <postcondition>Hotel record persisted in CatalogDbContext.Hotels</postcondition>
     public async Task<Hotel> CreateHotelAsync(CreateHotelRequest request)
@@ -23,7 +43,7 @@ public class InventoryService(CatalogDbContext db, ICacheService cache, ILogger<
             ImageUrl = request.ImageUrl
         };
         db.Hotels.Add(hotel);
-        await db.SaveChangesAsync();
+        await SaveAsync();
         logger.LogInformation("Created hotel {HotelId} {Name}", hotel.HotelId, hotel.Name);
         return hotel;
     }
@@ -42,7 +62,7 @@ public class InventoryService(CatalogDbContext db, ICacheService cache, ILogger<
         if (request.ImageUrl is not null) hotel.ImageUrl = request.ImageUrl;
         if (request.IsActive.HasValue) hotel.IsActive = request.IsActive.Value;
 
-        await db.SaveChangesAsync();
+        await SaveAsync();
         await cache.RemoveAsync($"hotel:detail:{hotelId}");
         return hotel;
     }
@@ -65,7 +85,7 @@ public class InventoryService(CatalogDbContext db, ICacheService cache, ILogger<
             BasePricePerNight = request.BasePricePerNight
         };
         db.RoomTypes.Add(roomType);
-        await db.SaveChangesAsync();
+        await SaveAsync();
         return roomType;
     }
 
@@ -113,7 +133,7 @@ public class InventoryService(CatalogDbContext db, ICacheService cache, ILogger<
             existing.IsAvailable = request.IsAvailable;
         }
 
-        await db.SaveChangesAsync();
+        await SaveAsync();
         await cache.RemoveAsync($"hotel:detail:{request.HotelId}");
         logger.LogInformation("Upserted inventory for RoomType {RoomTypeId}", request.RoomTypeId);
     }

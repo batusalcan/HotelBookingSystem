@@ -1,13 +1,14 @@
 using CommentsService.DTOs;
 using CommentsService.Services;
+using Polly;
 using SharedKernel.Exceptions;
 
 namespace CommentsService.Tests;
 
 public class CommentValidationTests
 {
-    // Guard clauses fire before any MongoDB access, so we pass null! for both dependencies.
-    private static HotelCommentsService Sut() => new(null!, null!);
+    // Guard clauses fire before any MongoDB access, so we pass null! for DB/logger and Empty pipeline.
+    private static HotelCommentsService Sut() => new(null!, null!, ResiliencePipeline.Empty);
 
     private static PostCommentRequest ValidRequest(string text = "Great hotel!", double rating = 8.5) => new()
     {
