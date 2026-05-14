@@ -5,8 +5,8 @@
       "UpstreamPathTemplate": "/gateway/v1/admin/inventory",
       "UpstreamHttpMethod": [ "POST" ],
       "DownstreamPathTemplate": "/api/v1/admin/inventory",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
@@ -19,8 +19,8 @@
       "UpstreamPathTemplate": "/gateway/v1/admin/hotels",
       "UpstreamHttpMethod": [ "GET", "POST" ],
       "DownstreamPathTemplate": "/api/v1/admin/hotels",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
@@ -33,8 +33,8 @@
       "UpstreamPathTemplate": "/gateway/v1/admin/hotels/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT" ],
       "DownstreamPathTemplate": "/api/v1/admin/hotels/{everything}",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
@@ -47,8 +47,8 @@
       "UpstreamPathTemplate": "/gateway/v1/search/hotels",
       "UpstreamHttpMethod": [ "GET" ],
       "DownstreamPathTemplate": "/api/v1/search/hotels",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
       "RateLimitOptions": {
         "ClientWhitelist": [],
@@ -63,8 +63,8 @@
       "UpstreamPathTemplate": "/gateway/v1/hotels/{everything}",
       "UpstreamHttpMethod": [ "GET" ],
       "DownstreamPathTemplate": "/api/v1/hotels/{everything}",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
       "RateLimitOptions": { "EnableRateLimiting": false }
     },
@@ -73,8 +73,8 @@
       "UpstreamPathTemplate": "/gateway/v1/bookings",
       "UpstreamHttpMethod": [ "POST" ],
       "DownstreamPathTemplate": "/api/v1/bookings",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5200 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
@@ -87,8 +87,8 @@
       "UpstreamPathTemplate": "/gateway/v1/comments/{hotelId}",
       "UpstreamHttpMethod": [ "GET" ],
       "DownstreamPathTemplate": "/api/v1/comments/{hotelId}",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5223 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-comments-c9ejhwftbch5eqey.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "commentsservice",
       "RateLimitOptions": { "EnableRateLimiting": false }
     },
@@ -97,8 +97,8 @@
       "UpstreamPathTemplate": "/gateway/v1/comments/{hotelId}",
       "UpstreamHttpMethod": [ "POST" ],
       "DownstreamPathTemplate": "/api/v1/comments/{hotelId}",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5223 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-comments-c9ejhwftbch5eqey.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "commentsservice",
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
@@ -111,8 +111,8 @@
       "UpstreamPathTemplate": "/gateway/v1/ai/chat",
       "UpstreamHttpMethod": [ "POST" ],
       "DownstreamPathTemplate": "/api/v1/ai/chat",
-      "DownstreamScheme": "http",
-      "DownstreamHostAndPorts": [ { "Host": "localhost", "Port": 5160 } ],
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-aiagent-g2avhjfcfyhqcsfd.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "aiagentservice",
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer",
@@ -136,7 +136,7 @@
         {
           "Name": "Hotel Service",
           "Version": "v1",
-          "Url": "http://localhost:5200/swagger/v1/swagger.json"
+          "Url": "https://hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net/swagger/v1/swagger.json"
         }
       ]
     },
@@ -146,7 +146,7 @@
         {
           "Name": "Comments Service",
           "Version": "v1",
-          "Url": "http://localhost:5223/swagger/v1/swagger.json"
+          "Url": "https://hotel-comments-c9ejhwftbch5eqey.italynorth-01.azurewebsites.net/swagger/v1/swagger.json"
         }
       ]
     },
@@ -156,14 +156,14 @@
         {
           "Name": "AI Agent Service",
           "Version": "v1",
-          "Url": "http://localhost:5160/swagger/v1/swagger.json"
+          "Url": "https://hotel-aiagent-g2avhjfcfyhqcsfd.italynorth-01.azurewebsites.net/swagger/v1/swagger.json"
         }
       ]
     }
   ],
 
   "GlobalConfiguration": {
-    "BaseUrl": "http://localhost:5158",
+    "BaseUrl": "https://hotel-gateway-axhpduheewacbvhc.italynorth-01.azurewebsites.net",
     "RateLimitOptions": {
       "ClientIdHeader": "X-Client-IP",
       "QuotaExceededMessage": "Too many requests. Please try again later.",
