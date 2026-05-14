@@ -20,6 +20,12 @@ public class RabbitMqHealthCheck(IConfiguration config) : IHealthCheck
                 Port = int.Parse(config["RabbitMQ:Port"] ?? "5672"),
                 UserName = config["RabbitMQ:Username"] ?? "guest",
                 Password = config["RabbitMQ:Password"] ?? "guest",
+                VirtualHost = config["RabbitMQ:VirtualHost"] ?? "/",
+                Ssl = new SslOption
+                {
+                    Enabled = bool.Parse(config["RabbitMQ:Ssl"] ?? "false"),
+                    ServerName = config["RabbitMQ:Host"] ?? "localhost"
+                },
                 RequestedConnectionTimeout = TimeSpan.FromSeconds(3)
             };
             using var conn = factory.CreateConnection();

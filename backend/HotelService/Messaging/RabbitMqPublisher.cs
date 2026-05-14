@@ -27,7 +27,13 @@ public class RabbitMqPublisher : IRabbitMqPublisher, IDisposable
             HostName = config["RabbitMQ:Host"] ?? "localhost",
             Port = int.Parse(config["RabbitMQ:Port"] ?? "5672"),
             UserName = config["RabbitMQ:Username"] ?? "guest",
-            Password = config["RabbitMQ:Password"] ?? "guest"
+            Password = config["RabbitMQ:Password"] ?? "guest",
+            VirtualHost = config["RabbitMQ:VirtualHost"] ?? "/",
+            Ssl = new SslOption
+            {
+                Enabled = bool.Parse(config["RabbitMQ:Ssl"] ?? "false"),
+                ServerName = config["RabbitMQ:Host"] ?? "localhost"
+            }
         };
 
         try
