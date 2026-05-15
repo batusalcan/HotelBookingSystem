@@ -42,7 +42,7 @@ export default function CommentSection({ hotelId }) {
     setLoading(true)
     try {
       const res = await getComments(hotelId, { page: p, pageSize: 5 })
-      setData(res.data)
+      setData(res.data.data)
     } catch {
       setData(null)
     } finally {

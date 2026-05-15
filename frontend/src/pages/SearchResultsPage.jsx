@@ -28,8 +28,9 @@ export default function SearchResultsPage() {
     setError(null)
     searchHotels({ ...sp, page, pageSize: 10 })
       .then(({ data }) => {
-        setHotels(data.data ?? [])
-        setMeta({ page: data.page, totalPages: data.totalPages, totalRecords: data.totalRecords })
+        const payload = data.data
+        setHotels(payload?.data ?? [])
+        setMeta({ page: payload?.page ?? 1, totalPages: payload?.totalPages ?? 1, totalRecords: payload?.totalRecords ?? 0 })
       })
       .catch(() => setError('Something went wrong while searching. Please try again.'))
       .finally(() => setLoading(false))

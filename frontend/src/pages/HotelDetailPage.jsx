@@ -35,7 +35,7 @@ export default function HotelDetailPage() {
     setLoadingRoom(true)
     try {
       const { data } = await getRoomDetail(hotelId, rt.roomTypeId, { startDate, endDate })
-      setRoomDetail(data)
+      setRoomDetail(data.data)
     } catch {
       setRoomDetail(null)
     } finally {
@@ -58,7 +58,7 @@ export default function HotelDetailPage() {
         guestCount,
         rowVersion: roomDetail.rowVersion,
       })
-      navigate('/bookings/confirm', { state: { booking: data, hotelId, room: selectedRoom } })
+      navigate('/bookings/confirm', { state: { booking: data.data, hotelId, room: selectedRoom } })
     } catch (err) {
       const status = err.response?.status
       if (status === 409) setBookingError('This room was just booked by someone else. Please try again or choose another room.')
