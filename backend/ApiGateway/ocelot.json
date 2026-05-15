@@ -71,8 +71,22 @@
 
     {
       "UpstreamPathTemplate": "/gateway/v1/bookings",
-      "UpstreamHttpMethod": [ "POST" ],
+      "UpstreamHttpMethod": [ "GET", "POST" ],
       "DownstreamPathTemplate": "/api/v1/bookings",
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
+      "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
+      "UpstreamPathTemplate": "/gateway/v1/bookings/{bookingId}",
+      "UpstreamHttpMethod": [ "DELETE" ],
+      "DownstreamPathTemplate": "/api/v1/bookings/{bookingId}",
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",

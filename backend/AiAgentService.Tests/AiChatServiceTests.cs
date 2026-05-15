@@ -60,6 +60,12 @@ public class AiChatServiceTests
                 Status = "Confirmed"
             });
         }
+
+        public Task<List<AiBookingDto>> GetUserBookingsAsync(string authToken)
+            => Task.FromResult(new List<AiBookingDto>());
+
+        public Task CancelBookingAsync(Guid bookingId, string authToken)
+            => Task.CompletedTask;
     }
 
     private static AiChatService Build(IAiProvider provider, IHotelSystemFacade facade) =>

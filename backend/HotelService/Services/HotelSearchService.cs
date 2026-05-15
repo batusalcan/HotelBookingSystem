@@ -72,7 +72,7 @@ public class HotelSearchService(
                      && i.StartDate <= request.EndDate
                      && i.EndDate >= request.StartDate
                      && i.RoomType.Hotel.IsActive
-                     && i.RoomType.Hotel.Destination.ToLower().Contains(request.Destination.ToLower()))
+                     && EF.Functions.Like(i.RoomType.Hotel.Destination, $"%{request.Destination}%"))
             .Select(i => new HotelSearchResult
             {
                 HotelId = i.RoomType.Hotel.HotelId,
