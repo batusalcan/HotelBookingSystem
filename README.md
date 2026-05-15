@@ -14,7 +14,7 @@ A Hotels.com-like microservices platform built with C# .NET Core 8.
 | **Comments Service** | https://hotel-comments-c9ejhwftbch5eqey.italynorth-01.azurewebsites.net |
 | **AI Agent Service** | https://hotel-aiagent-g2avhjfcfyhqcsfd.italynorth-01.azurewebsites.net |
 | **Notification Service** | https://hotel-notification-eccyh5cpdxhpg9b2.italynorth-01.azurewebsites.net |
-| **Frontend** | *(Vercel — link to be added after deployment)* |
+| **Frontend** | https://hotel-booking-system-henna.vercel.app |
 
 All services are deployed to **Azure App Service (Italy North)** under the B1 plan.
 
