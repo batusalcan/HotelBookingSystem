@@ -5,7 +5,7 @@ const DESTINATIONS = [
   { name: 'Istanbul', img: 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=800&q=80' },
   { name: 'Bodrum',   img: 'https://images.unsplash.com/photo-1547036967-23d11aacaee0?auto=format&fit=crop&w=800&q=80' },
   { name: 'Antalya',  img: 'https://images.unsplash.com/photo-1570168007204-dfb528c6958f?auto=format&fit=crop&w=800&q=80' },
-  { name: 'Izmir',    img: 'https://images.unsplash.com/photo-1562183241-840b8af0721e?auto=format&fit=crop&w=800&q=80' },
+  { name: 'Izmir',    img: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=800&q=80' },
 ]
 
 const FEATURES = [

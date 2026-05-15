@@ -15,6 +15,12 @@ export const getRoomDetail = (hotelId, roomTypeId, params) =>
 export const createBooking = (payload) =>
   client.post('/bookings', payload)
 
+export const getUserBookings = () =>
+  client.get('/bookings')
+
+export const cancelBooking = (bookingId) =>
+  client.delete(`/bookings/${bookingId}`)
+
 // Admin
 export const adminListHotels = (params) =>
   client.get('/admin/hotels', { params })

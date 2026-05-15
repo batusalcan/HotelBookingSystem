@@ -17,41 +17,50 @@ public class AiChatService(
     // "book" removed — too ambiguous ("I want to book Hilton" ≠ final confirmation)
     private static readonly string[] ConfirmKeywords =
         ["yes", "book it", "confirm", "reserve", "sure", "ok", "yep", "yeah",
-         "evet", "onayla", "rezerve et", "rezervasyon yap"];
+         "cancel it", "evet", "onayla", "rezerve et", "rezervasyon yap", "iptal et"];
 
-    /// <precondition>request.UserMessage is non-empty; userId is non-empty</precondition>
+    /// <precondition>request.UserMessage non-empty; userId non-empty</precondition>
     /// <postcondition>
-    /// Three-step flow:
-    ///   1. SEARCH — Gemini extracts params → hotels presented, PendingAction="SELECT"
-    ///   2. SELECT — user picks a hotel by name/number → room detail fetched, PendingAction="BOOK"
-    ///   3. BOOK   — user confirms → booking executed
+    /// Four-step flow:
+    ///   SEARCH  → Gemini extracts params → hotels presented, PendingAction=SELECT
+    ///   SELECT  → user picks hotel by name/number → room detail fetched, PendingAction=BOOK
+    ///   BOOK    → user confirms → booking executed
+    ///   CANCEL  → Gemini detects cancel intent → show bookings, PendingAction=CANCEL_SELECT
+    ///   CANCEL_SELECT → user picks booking → PendingAction=CANCEL_CONFIRM
+    ///   CANCEL_CONFIRM → user confirms → cancellation executed
     /// </postcondition>
     public async Task<ChatResponse> ProcessAsync(ChatRequest request, string userId, string? authToken)
     {
-        // Step BOOK: user is confirming a pre-selected hotel
-        if (request.ContextState?.PendingAction == "BOOK" && IsConfirmation(request.UserMessage))
-            return await ExecuteBookingAsync(request.ContextState, authToken);
+        var state = request.ContextState?.PendingAction;
 
-        // Step SELECT: user is choosing which hotel from the presented list
-        if (request.ContextState?.PendingAction == "SELECT")
+        if (state == "BOOK" && IsConfirmation(request.UserMessage))
+            return await ExecuteBookingAsync(request.ContextState!, authToken);
+
+        if (state == "CANCEL_CONFIRM" && IsConfirmation(request.UserMessage))
+            return await ExecuteCancellationAsync(request.ContextState!, authToken);
+
+        if (state == "CANCEL_SELECT")
+            return await HandleCancelSelectionAsync(request, authToken);
+
+        if (state == "SELECT")
             return await HandleHotelSelectionAsync(request, authToken);
 
-        // Step SEARCH: parse intent via Gemini
+        // Parse intent via Gemini
         var prompt = BuildSearchPrompt(request.UserMessage, request.ContextState, request.Messages);
         string aiRaw;
-        try
-        {
-            aiRaw = await aiProvider.GenerateAsync(prompt);
-        }
+        try { aiRaw = await aiProvider.GenerateAsync(prompt); }
         catch (Exception ex)
         {
             logger.LogError(ex, "AI provider call failed");
-            return Clarify("I'm having trouble understanding that right now. Could you rephrase your request?", request.ContextState);
+            return Clarify("I'm having trouble right now. Could you rephrase your request?", request.ContextState);
         }
 
         var intent = ParseIntent(aiRaw);
         if (intent is null)
-            return Clarify("Could you give me a bit more detail? I need the destination, dates, and number of guests.", request.ContextState);
+            return Clarify("Could you give me more detail? I need the destination, dates, and number of guests.", request.ContextState);
+
+        if (intent.Intent == "CANCEL")
+            return await HandleCancelIntentAsync(authToken);
 
         if (intent.Intent == "SEARCH"
             && intent.Destination is not null
@@ -72,48 +81,51 @@ public class AiChatService(
 
     private async Task<ChatResponse> HandleHotelSelectionAsync(ChatRequest request, string? authToken)
     {
-        var hotels = DeserializeHotels(request.ContextState!.HotelOptionsJson);
+        var hotels = DeserializeList<HotelOptionDto>(request.ContextState!.HotelOptionsJson);
         if (hotels.Count == 0)
             return Clarify("I lost track of the hotel options. Could you start your search again?", null);
 
-        var selectionPrompt = BuildSelectionPrompt(request.UserMessage, hotels);
+        // Single hotel: accept any confirmation as auto-select
+        if (hotels.Count == 1 && IsConfirmation(request.UserMessage))
+            return await BuildBookingConfirmation(hotels[0], request.ContextState!, authToken);
+
+        var selPrompt = BuildSelectionPrompt(request.UserMessage, hotels.Select(h => (h.Name, h.Location, h.PricePerNight, h.RoomTypeName)).ToList());
         string aiRaw;
-        try
-        {
-            aiRaw = await aiProvider.GenerateAsync(selectionPrompt);
-        }
+        try { aiRaw = await aiProvider.GenerateAsync(selPrompt); }
         catch (Exception ex)
         {
-            logger.LogError(ex, "AI provider call failed during hotel selection");
-            return Clarify("I'm having trouble right now. Which hotel would you like — say the name or number?", request.ContextState);
+            logger.LogError(ex, "AI selection call failed");
+            return Clarify("Could you tell me which hotel you'd like — by name or number?", request.ContextState);
         }
 
-        var selection = ParseSelection(aiRaw);
-        if (selection is null || selection.SelectedIndex < 0 || selection.SelectedIndex >= hotels.Count)
+        var sel = ParseSelection(aiRaw);
+        if (sel is null || sel.SelectedIndex < 0 || sel.SelectedIndex >= hotels.Count)
         {
             var relist = "Please tell me which hotel you'd like — say the hotel name or its number:\n\n" +
                 string.Join("\n", hotels.Select((h, i) => $"{i + 1}. {h.Name} — {h.PricePerNight:N0} TL/night ({h.RoomTypeName})"));
             return Clarify(relist, request.ContextState);
         }
 
-        var chosen = hotels[selection.SelectedIndex];
+        return await BuildBookingConfirmation(hotels[sel.SelectedIndex], request.ContextState!, authToken);
+    }
 
+    private async Task<ChatResponse> BuildBookingConfirmation(HotelOptionDto chosen, ContextState ctx, string? authToken)
+    {
         RoomDetailDto roomDetail;
         try
         {
             roomDetail = await facade.GetRoomDetailAsync(
                 chosen.HotelId, chosen.RoomTypeId,
-                DateOnly.Parse(request.ContextState.StartDate!),
-                DateOnly.Parse(request.ContextState.EndDate!));
+                DateOnly.Parse(ctx.StartDate!),
+                DateOnly.Parse(ctx.EndDate!));
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "GetRoomDetail failed for hotel {HotelId}", chosen.HotelId);
-            return Clarify("I couldn't confirm availability for that hotel. Please try another or search again.", request.ContextState);
+            return Clarify("I couldn't confirm availability for that hotel. Please try another or search again.", ctx);
         }
 
-        var nights = DateOnly.Parse(request.ContextState.EndDate!).DayNumber
-                   - DateOnly.Parse(request.ContextState.StartDate!).DayNumber;
+        var nights = DateOnly.Parse(ctx.EndDate!).DayNumber - DateOnly.Parse(ctx.StartDate!).DayNumber;
         var total = chosen.PricePerNight * nights;
 
         return new ChatResponse
@@ -121,18 +133,18 @@ public class AiChatService(
             Reply = $"Great choice! Here is your booking summary:\n\n" +
                     $"🏨 **{chosen.Name}**\n" +
                     $"🛏 Room: {chosen.RoomTypeName} | {chosen.PricePerNight:N0} TL/night\n" +
-                    $"📅 {request.ContextState.StartDate} → {request.ContextState.EndDate} ({nights} nights)\n" +
-                    $"👥 Guests: {request.ContextState.GuestCount}\n" +
+                    $"📅 {ctx.StartDate} → {ctx.EndDate} ({nights} nights)\n" +
+                    $"👥 Guests: {ctx.GuestCount}\n" +
                     $"💰 Total: {total:N0} TL\n\n" +
-                    "Say **\"Yes, book it\"** to confirm your reservation.",
+                    "Say **\"Yes, book it\"** to confirm.",
             RequiresConfirmation = true,
             ContextState = new ContextState
             {
                 PendingAction = "BOOK",
-                Destination = request.ContextState.Destination,
-                StartDate = request.ContextState.StartDate,
-                EndDate = request.ContextState.EndDate,
-                GuestCount = request.ContextState.GuestCount,
+                Destination = ctx.Destination,
+                StartDate = ctx.StartDate,
+                EndDate = ctx.EndDate,
+                GuestCount = ctx.GuestCount,
                 TargetHotelId = chosen.HotelId,
                 TargetRoomTypeId = chosen.RoomTypeId,
                 TargetInventoryId = roomDetail.InventoryId,
@@ -156,25 +168,21 @@ public class AiChatService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Facade.SearchHotels failed");
-            return Clarify("I couldn't reach the hotel service right now. Please try again in a moment.", null);
+            return Clarify("I couldn't reach the hotel service right now. Please try again.", null);
         }
 
         if (hotels.Count == 0)
-        {
             return new ChatResponse
             {
-                Reply = $"I couldn't find any available hotels in {intent.Destination} for those dates. " +
-                        "Would you like to try different dates or a nearby destination?",
+                Reply = $"No available hotels found in {intent.Destination} for those dates. " +
+                        "Try different dates or a nearby destination?",
                 RequiresConfirmation = false,
                 ContextState = null
             };
-        }
-
-        var reply = FormatHotelOptions(hotels, intent.Destination!, startDate, endDate);
 
         return new ChatResponse
         {
-            Reply = reply,
+            Reply = FormatHotelOptions(hotels, intent.Destination!, startDate, endDate),
             RequiresConfirmation = true,
             ContextState = new ContextState
             {
@@ -193,14 +201,7 @@ public class AiChatService(
     private async Task<ChatResponse> ExecuteBookingAsync(ContextState context, string? authToken)
     {
         if (string.IsNullOrEmpty(authToken))
-        {
-            return new ChatResponse
-            {
-                Reply = "You need to be logged in to complete a booking. Please sign in and try again.",
-                RequiresConfirmation = false,
-                ContextState = null
-            };
-        }
+            return new ChatResponse { Reply = "You need to be logged in to complete a booking. Please sign in and try again.", RequiresConfirmation = false, ContextState = null };
 
         try
         {
@@ -208,30 +209,124 @@ public class AiChatService(
             logger.LogInformation("AI booking confirmed BookingId={BookingId}", result.BookingId);
             return new ChatResponse
             {
-                Reply = $"✅ Your reservation at **{context.HotelName}** from {context.StartDate} to {context.EndDate} " +
-                        $"is confirmed!\n\nBooking ID: `{result.BookingId}`",
+                Reply = $"✅ Your reservation at **{context.HotelName}** from {context.StartDate} to {context.EndDate} is confirmed!\n\nBooking ID: `{result.BookingId}`",
                 RequiresConfirmation = false,
                 ContextState = null
             };
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
+            return new ChatResponse { Reply = "The room was just taken by another guest. Let me search again for available options.", RequiresConfirmation = false, ContextState = null };
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Booking via facade failed");
+            return new ChatResponse { Reply = "Something went wrong while booking. Please try again.", RequiresConfirmation = false, ContextState = null };
+        }
+    }
+
+    // ── Cancel flow ───────────────────────────────────────────────────────────
+
+    private async Task<ChatResponse> HandleCancelIntentAsync(string? authToken)
+    {
+        if (string.IsNullOrEmpty(authToken))
+            return new ChatResponse { Reply = "You need to be logged in to view or cancel bookings.", RequiresConfirmation = false, ContextState = null };
+
+        List<AiBookingDto> bookings;
+        try { bookings = await facade.GetUserBookingsAsync(authToken); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetUserBookings failed");
+            return new ChatResponse { Reply = "I couldn't retrieve your bookings right now. Please try again.", RequiresConfirmation = false, ContextState = null };
+        }
+
+        var active = bookings.Where(b => b.Status == "Confirmed").ToList();
+        if (active.Count == 0)
+            return new ChatResponse { Reply = "You have no active bookings to cancel.", RequiresConfirmation = false, ContextState = null };
+
+        var list = string.Join("\n", active.Select((b, i) =>
+            $"{i + 1}. {b.HotelName} — {b.CheckInDate:d MMM} → {b.CheckOutDate:d MMM} ({b.GuestCount} guests, {b.TotalAmount:N0} TL)"));
+
+        return new ChatResponse
+        {
+            Reply = $"Here are your active bookings:\n\n{list}\n\nWhich one would you like to cancel? Say the hotel name or its number.",
+            RequiresConfirmation = false,
+            ContextState = new ContextState
+            {
+                PendingAction = "CANCEL_SELECT",
+                CancelBookingsJson = JsonSerializer.Serialize(active, JsonOpts)
+            }
+        };
+    }
+
+    private async Task<ChatResponse> HandleCancelSelectionAsync(ChatRequest request, string? authToken)
+    {
+        var bookings = DeserializeList<AiBookingDto>(request.ContextState!.CancelBookingsJson);
+        if (bookings.Count == 0)
+            return Clarify("I lost track of your bookings. Please try again.", null);
+
+        if (bookings.Count == 1 && IsConfirmation(request.UserMessage))
+            return BuildCancelConfirmation(bookings[0], request.ContextState!);
+
+        var selPrompt = BuildSelectionPrompt(request.UserMessage,
+            bookings.Select(b => (b.HotelName, $"{b.CheckInDate:d MMM}–{b.CheckOutDate:d MMM}", b.TotalAmount, b.RoomTypeName)).ToList());
+
+        string aiRaw;
+        try { aiRaw = await aiProvider.GenerateAsync(selPrompt); }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AI cancel selection failed");
+            return Clarify("Which booking would you like to cancel?", request.ContextState);
+        }
+
+        var sel = ParseSelection(aiRaw);
+        if (sel is null || sel.SelectedIndex < 0 || sel.SelectedIndex >= bookings.Count)
+        {
+            var relist = "Please tell me which booking to cancel — say the hotel name or number:\n\n" +
+                string.Join("\n", bookings.Select((b, i) => $"{i + 1}. {b.HotelName} ({b.CheckInDate:d MMM})"));
+            return Clarify(relist, request.ContextState);
+        }
+
+        return BuildCancelConfirmation(bookings[sel.SelectedIndex], request.ContextState!);
+    }
+
+    private static ChatResponse BuildCancelConfirmation(AiBookingDto booking, ContextState ctx)
+    {
+        _ = ctx;
+        return new ChatResponse
+        {
+            Reply = $"Are you sure you want to cancel your booking at **{booking.HotelName}**?\n" +
+                    $"📅 {booking.CheckInDate:d MMM} → {booking.CheckOutDate:d MMM} | 💰 {booking.TotalAmount:N0} TL\n\n" +
+                    "Say **\"Yes, cancel it\"** to confirm.",
+            RequiresConfirmation = true,
+            ContextState = new ContextState
+            {
+                PendingAction = "CANCEL_CONFIRM",
+                CancelBookingId = booking.BookingId,
+                CancelHotelName = booking.HotelName
+            }
+        };
+    }
+
+    private async Task<ChatResponse> ExecuteCancellationAsync(ContextState context, string? authToken)
+    {
+        if (string.IsNullOrEmpty(authToken))
+            return new ChatResponse { Reply = "You need to be logged in to cancel bookings.", RequiresConfirmation = false, ContextState = null };
+
+        try
+        {
+            await facade.CancelBookingAsync(context.CancelBookingId!.Value, authToken);
             return new ChatResponse
             {
-                Reply = "The room was just taken by another guest. Let me search again for available options.",
+                Reply = $"✅ Your booking at **{context.CancelHotelName}** has been cancelled successfully.",
                 RequiresConfirmation = false,
                 ContextState = null
             };
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Booking via facade failed");
-            return new ChatResponse
-            {
-                Reply = "Something went wrong while booking. Please try again.",
-                RequiresConfirmation = false,
-                ContextState = null
-            };
+            logger.LogError(ex, "Cancellation failed for booking {BookingId}", context.CancelBookingId);
+            return new ChatResponse { Reply = "Something went wrong while cancelling. Please try again.", RequiresConfirmation = false, ContextState = null };
         }
     }
 
@@ -243,62 +338,58 @@ public class AiChatService(
         var sb = new StringBuilder();
 
         sb.AppendLine("You are a hotel booking assistant for a Hotels.com-like service in Turkey.");
-        sb.AppendLine("Extract the user's hotel search intent and return ONLY valid JSON (no markdown, no code blocks).");
+        sb.AppendLine("Analyze the user's message and return ONLY valid JSON (no markdown, no code blocks).");
         sb.AppendLine();
         sb.AppendLine("JSON schema:");
         sb.AppendLine("{");
-        sb.AppendLine("  \"intent\": \"SEARCH\" | \"CLARIFY\",");
-        sb.AppendLine("  \"destination\": \"city name as string, or null\",");
+        sb.AppendLine("  \"intent\": \"SEARCH\" | \"CLARIFY\" | \"CANCEL\",");
+        sb.AppendLine("  \"destination\": \"city name or null\",");
         sb.AppendLine("  \"startDate\": \"YYYY-MM-DD or null\",");
         sb.AppendLine("  \"endDate\": \"YYYY-MM-DD or null\",");
-        sb.AppendLine("  \"guestCount\": \"integer or null\",");
-        sb.AppendLine("  \"reply\": \"your friendly response to the user\"");
+        sb.AppendLine("  \"guestCount\": integer or null,");
+        sb.AppendLine("  \"reply\": \"your friendly response\"");
         sb.AppendLine("}");
         sb.AppendLine();
         sb.AppendLine("Rules:");
-        sb.AppendLine("- Use intent SEARCH only when destination, startDate, endDate, AND guestCount are ALL present or determinable.");
-        sb.AppendLine("- Use intent CLARIFY when any required parameter is missing; ask for only the missing ones in reply.");
-        sb.AppendLine($"- Today's date is {today}. Calculate exact dates for relative expressions like 'next weekend', 'this Friday'.");
+        sb.AppendLine("- SEARCH: all four params (destination, startDate, endDate, guestCount) are determinable.");
+        sb.AppendLine("- CLARIFY: any required param is missing — ask for only the missing ones.");
+        sb.AppendLine("- CANCEL: user wants to cancel, view, or manage existing reservations.");
+        sb.AppendLine($"- Today is {today}. Resolve relative dates ('next weekend', 'tomorrow') to exact dates.");
         sb.AppendLine("- Reply in the same language as the user (Turkish or English).");
-        sb.AppendLine("- Use the conversation history below to understand references to previous messages.");
 
         if (context?.PendingAction == "CLARIFY")
         {
             sb.AppendLine();
-            sb.AppendLine("Partial context from previous turn:");
-            if (context.Destination is not null) sb.AppendLine($"- destination already known: {context.Destination}");
-            if (context.StartDate is not null) sb.AppendLine($"- startDate already known: {context.StartDate}");
-            if (context.EndDate is not null) sb.AppendLine($"- endDate already known: {context.EndDate}");
-            if (context.GuestCount is not null) sb.AppendLine($"- guestCount already known: {context.GuestCount}");
+            sb.AppendLine("Already known from previous turn:");
+            if (context.Destination is not null) sb.AppendLine($"- destination: {context.Destination}");
+            if (context.StartDate is not null) sb.AppendLine($"- startDate: {context.StartDate}");
+            if (context.EndDate is not null) sb.AppendLine($"- endDate: {context.EndDate}");
+            if (context.GuestCount is not null) sb.AppendLine($"- guestCount: {context.GuestCount}");
         }
 
         if (history is { Count: > 0 })
         {
             sb.AppendLine();
-            sb.AppendLine("Conversation history (oldest first):");
+            sb.AppendLine("Conversation history:");
             foreach (var msg in history)
-            {
-                var label = msg.Role == "user" ? "User" : "Assistant";
-                sb.AppendLine($"{label}: {msg.Text}");
-            }
+                sb.AppendLine($"{(msg.Role == "user" ? "User" : "Assistant")}: {msg.Text}");
         }
 
         sb.AppendLine();
-        sb.AppendLine($"User message: \"{userMessage}\"");
-
+        sb.AppendLine($"User: \"{userMessage}\"");
         return sb.ToString();
     }
 
-    private static string BuildSelectionPrompt(string userMessage, List<HotelOptionDto> hotels)
+    private static string BuildSelectionPrompt(string userMessage, List<(string Name, string Info, decimal Price, string RoomType)> options)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("A user was shown a list of hotels and is now choosing one.");
-        sb.AppendLine("Return ONLY valid JSON (no markdown): {\"selectedIndex\": N, \"reply\": \"...\"}");
-        sb.AppendLine("selectedIndex is 0-based. Return -1 if the user is not making a clear hotel selection.");
+        sb.AppendLine("A user is selecting an item from a numbered list. Return ONLY valid JSON:");
+        sb.AppendLine("{\"selectedIndex\": N, \"reply\": \"...\"}");
+        sb.AppendLine("selectedIndex is 0-based. Return -1 if no clear selection.");
         sb.AppendLine();
-        sb.AppendLine("Available hotels:");
-        for (int i = 0; i < hotels.Count; i++)
-            sb.AppendLine($"{i + 1}. {hotels[i].Name} ({hotels[i].Location}) — {hotels[i].PricePerNight:N0} TL/night ({hotels[i].RoomTypeName})");
+        sb.AppendLine("Options:");
+        for (int i = 0; i < options.Count; i++)
+            sb.AppendLine($"{i + 1}. {options[i].Name} ({options[i].Info}) — {options[i].Price:N0} TL ({options[i].RoomType})");
         sb.AppendLine();
         sb.AppendLine($"User said: \"{userMessage}\"");
         return sb.ToString();
@@ -306,14 +397,12 @@ public class AiChatService(
 
     // ── Format helpers ────────────────────────────────────────────────────────
 
-    private static string FormatHotelOptions(
-        List<HotelOptionDto> hotels, string destination, DateOnly startDate, DateOnly endDate)
+    private static string FormatHotelOptions(List<HotelOptionDto> hotels, string dest, DateOnly start, DateOnly end)
     {
-        var nights = endDate.DayNumber - startDate.DayNumber;
+        var nights = end.DayNumber - start.DayNumber;
         var sb = new StringBuilder();
-        sb.AppendLine($"Here are the top {Math.Min(hotels.Count, 3)} hotels in {destination} ({startDate:d MMM} – {endDate:d MMM}, {nights} night{(nights > 1 ? "s" : "")}):");
+        sb.AppendLine($"Here are the top {Math.Min(hotels.Count, 3)} hotels in {dest} ({start:d MMM} – {end:d MMM}, {nights} night{(nights != 1 ? "s" : "")}):");
         sb.AppendLine();
-
         foreach (var h in hotels.Take(3))
         {
             sb.AppendLine($"🏨 {h.Name} — {h.Location}");
@@ -321,7 +410,6 @@ public class AiChatService(
             sb.AppendLine($"   Room: {h.RoomTypeName} | Available rooms: {h.AvailableRooms}");
             sb.AppendLine();
         }
-
         sb.AppendLine("Which hotel would you like? Say the hotel name or its number (1, 2, etc.).");
         return sb.ToString().TrimEnd();
     }
@@ -332,13 +420,7 @@ public class AiChatService(
     {
         try
         {
-            var json = raw.Trim();
-            if (json.StartsWith("```"))
-            {
-                var start = json.IndexOf('\n') + 1;
-                var end = json.LastIndexOf("```");
-                if (end > start) json = json[start..end].Trim();
-            }
+            var json = StripFences(raw);
             return JsonSerializer.Deserialize<GeminiIntent>(json, JsonOpts);
         }
         catch { return null; }
@@ -348,16 +430,19 @@ public class AiChatService(
     {
         try
         {
-            var json = raw.Trim();
-            if (json.StartsWith("```"))
-            {
-                var start = json.IndexOf('\n') + 1;
-                var end = json.LastIndexOf("```");
-                if (end > start) json = json[start..end].Trim();
-            }
+            var json = StripFences(raw);
             return JsonSerializer.Deserialize<HotelSelection>(json, JsonOpts);
         }
         catch { return null; }
+    }
+
+    private static string StripFences(string raw)
+    {
+        var json = raw.Trim();
+        if (!json.StartsWith("```")) return json;
+        var start = json.IndexOf('\n') + 1;
+        var end = json.LastIndexOf("```");
+        return end > start ? json[start..end].Trim() : json;
     }
 
     private static bool IsConfirmation(string message)
@@ -366,10 +451,10 @@ public class AiChatService(
         return ConfirmKeywords.Any(k => lower.Contains(k));
     }
 
-    private static List<HotelOptionDto> DeserializeHotels(string? json)
+    private static List<T> DeserializeList<T>(string? json)
     {
         if (string.IsNullOrEmpty(json)) return [];
-        try { return JsonSerializer.Deserialize<List<HotelOptionDto>>(json, JsonOpts) ?? []; }
+        try { return JsonSerializer.Deserialize<List<T>>(json, JsonOpts) ?? []; }
         catch { return []; }
     }
 
@@ -379,12 +464,13 @@ public class AiChatService(
         RequiresConfirmation = false,
         ContextState = carry is null ? null : new ContextState
         {
-            PendingAction = carry.PendingAction == "SELECT" ? "SELECT" : "CLARIFY",
+            PendingAction = carry.PendingAction is "SELECT" or "CANCEL_SELECT" ? carry.PendingAction : "CLARIFY",
             Destination = carry.Destination,
             StartDate = carry.StartDate,
             EndDate = carry.EndDate,
             GuestCount = carry.GuestCount,
-            HotelOptionsJson = carry.HotelOptionsJson
+            HotelOptionsJson = carry.HotelOptionsJson,
+            CancelBookingsJson = carry.CancelBookingsJson
         }
     };
 

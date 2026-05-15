@@ -37,4 +37,14 @@ public class ContextState
     // Serialized List<HotelOptionDto> stored while user is choosing (PendingAction=="SELECT")
     [JsonPropertyName("hotelOptionsJson")]
     public string? HotelOptionsJson { get; set; }
+
+    // Cancellation flow fields
+    [JsonPropertyName("cancelBookingsJson")]
+    public string? CancelBookingsJson { get; set; }
+
+    [JsonPropertyName("cancelBookingId")]
+    public Guid? CancelBookingId { get; set; }
+
+    [JsonPropertyName("cancelHotelName")]
+    public string? CancelHotelName { get; set; }
 }

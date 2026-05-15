@@ -153,4 +153,79 @@ public class BookingService(
 
         return new BookingConfirmationDto { BookingId = booking.BookingId, Status = booking.Status };
     }
+
+    /// <precondition>userId is a valid non-empty user identifier from JWT</precondition>
+    /// <postcondition>Returns all bookings for the user enriched with hotel and room type names from CatalogDb</postcondition>
+    public async Task<List<BookingDto>> GetUserBookingsAsync(string userId)
+    {
+        var bookings = await bookingDb.Bookings
+            .Where(b => b.UserId == userId)
+            .OrderByDescending(b => b.CreatedAt)
+            .ToListAsync();
+
+        if (bookings.Count == 0) return [];
+
+        var hotelIds = bookings.Select(b => b.HotelId).Distinct().ToList();
+        var roomTypeIds = bookings.Select(b => b.RoomTypeId).Distinct().ToList();
+
+        var hotels = await catalogDb.Hotels
+            .Where(h => hotelIds.Contains(h.HotelId))
+            .Select(h => new { h.HotelId, h.Name })
+            .ToListAsync();
+
+        var roomTypes = await catalogDb.RoomTypes
+            .Where(r => roomTypeIds.Contains(r.RoomTypeId))
+            .Select(r => new { r.RoomTypeId, r.TypeName })
+            .ToListAsync();
+
+        var hotelMap = hotels.ToDictionary(h => h.HotelId, h => h.Name);
+        var roomMap = roomTypes.ToDictionary(r => r.RoomTypeId, r => r.TypeName);
+
+        return bookings.Select(b => new BookingDto
+        {
+            BookingId = b.BookingId,
+            HotelId = b.HotelId,
+            HotelName = hotelMap.GetValueOrDefault(b.HotelId, "Unknown Hotel"),
+            RoomTypeName = roomMap.GetValueOrDefault(b.RoomTypeId, "Unknown Room"),
+            CheckInDate = b.CheckInDate,
+            CheckOutDate = b.CheckOutDate,
+            GuestCount = b.GuestCount,
+            TotalAmount = b.TotalAmount,
+            Status = b.Status,
+            CreatedAt = b.CreatedAt
+        }).ToList();
+    }
+
+    /// <precondition>bookingId belongs to userId; booking Status == "Confirmed"</precondition>
+    /// <postcondition>
+    /// Booking Status set to "Cancelled" in BookingDb.
+    /// Matching InventoryBlock.AvailableCount incremented by 1 in CatalogDb (IsAvailable restored if was 0).
+    /// </postcondition>
+    public async Task CancelBookingAsync(Guid bookingId, string userId)
+    {
+        var booking = await bookingDb.Bookings
+            .FirstOrDefaultAsync(b => b.BookingId == bookingId && b.UserId == userId)
+            ?? throw new NotFoundException($"Booking {bookingId} not found.");
+
+        if (booking.Status == "Cancelled")
+            throw new AppException("Booking is already cancelled.", 400);
+
+        booking.Status = "Cancelled";
+        await bookingDb.SaveChangesAsync();
+
+        // Restore inventory — find block covering the booking's date range
+        var block = await catalogDb.InventoryBlocks
+            .FirstOrDefaultAsync(i => i.RoomTypeId == booking.RoomTypeId
+                && i.StartDate <= booking.CheckInDate
+                && i.EndDate >= booking.CheckOutDate);
+
+        if (block is not null)
+        {
+            block.AvailableCount++;
+            block.IsAvailable = true;
+            await catalogDb.SaveChangesAsync();
+        }
+
+        logger.LogInformation("Booking {BookingId} cancelled by user {UserId}", bookingId, userId);
+    }
 }

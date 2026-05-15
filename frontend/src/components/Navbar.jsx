@@ -19,6 +19,11 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-4 text-sm">
+          {session && (
+            <Link to="/bookings" className="text-teal-200 hover:text-white font-medium transition">
+              My Bookings
+            </Link>
+          )}
           {session && isAdmin && (
             <Link to="/admin" className="text-teal-200 hover:text-white font-medium transition">
               Admin Panel

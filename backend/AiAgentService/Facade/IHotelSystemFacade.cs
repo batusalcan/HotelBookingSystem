@@ -17,6 +17,14 @@ public interface IHotelSystemFacade
     /// <precondition>contextState has all booking fields populated; authToken is a valid user JWT</precondition>
     /// <postcondition>Room booked via HotelService; returns bookingId and status</postcondition>
     Task<BookingResultDto> BookRoomAsync(ContextState contextState, string authToken);
+
+    /// <precondition>authToken is a valid user JWT</precondition>
+    /// <postcondition>Returns all bookings for the authenticated user</postcondition>
+    Task<List<AiBookingDto>> GetUserBookingsAsync(string authToken);
+
+    /// <precondition>bookingId exists and belongs to the authenticated user; authToken is valid</precondition>
+    /// <postcondition>Booking cancelled; inventory restored via HotelService</postcondition>
+    Task CancelBookingAsync(Guid bookingId, string authToken);
 }
 
 public class RoomDetailDto
@@ -28,5 +36,17 @@ public class RoomDetailDto
 public class BookingResultDto
 {
     public Guid BookingId { get; set; }
+    public string Status { get; set; } = string.Empty;
+}
+
+public class AiBookingDto
+{
+    public Guid BookingId { get; set; }
+    public string HotelName { get; set; } = string.Empty;
+    public string RoomTypeName { get; set; } = string.Empty;
+    public DateOnly CheckInDate { get; set; }
+    public DateOnly CheckOutDate { get; set; }
+    public int GuestCount { get; set; }
+    public decimal TotalAmount { get; set; }
     public string Status { get; set; } = string.Empty;
 }

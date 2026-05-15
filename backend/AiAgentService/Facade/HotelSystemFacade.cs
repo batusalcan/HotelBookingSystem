@@ -97,6 +97,30 @@ public class HotelSystemFacade(HttpClient http, ILogger<HotelSystemFacade> logge
         };
     }
 
+    /// <precondition>authToken is a valid user JWT</precondition>
+    /// <postcondition>Returns confirmed+cancelled bookings from HotelService for the authenticated user</postcondition>
+    public async Task<List<AiBookingDto>> GetUserBookingsAsync(string authToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/bookings");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
+
+        var response = await http.SendAsync(request);
+        if (!response.IsSuccessStatusCode) return [];
+
+        var envelope = await response.Content.ReadFromJsonAsync<ApiEnvelope<List<AiBookingDto>>>(JsonOpts);
+        return envelope?.Data ?? [];
+    }
+
+    /// <precondition>bookingId exists and belongs to the authenticated user</precondition>
+    /// <postcondition>Booking cancelled and inventory restored via HotelService; throws on failure</postcondition>
+    public async Task CancelBookingAsync(Guid bookingId, string authToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/v1/bookings/{bookingId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", authToken);
+        var response = await http.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+    }
+
     // ── Internal deserialization types ───────────────────────────────────────
     private record ApiEnvelope<T>(
         [property: JsonPropertyName("success")] bool Success,

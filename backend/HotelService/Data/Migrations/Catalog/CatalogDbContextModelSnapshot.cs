@@ -74,7 +74,7 @@ namespace HotelService.Data.Migrations.Catalog
                             BaseRating = 9.2m,
                             Description = "Perched above the Bosphorus Strait with panoramic views of two continents, Swissôtel The Bosphorus combines Swiss precision with Istanbul's timeless elegance. The hotel features award-winning spa facilities, multiple fine-dining restaurants, and a rooftop infinity pool overlooking the historic skyline.",
                             Destination = "Istanbul",
-                            ImageUrl = "https://images.unsplash.com/photo-1560347876-aeef00ee58a1?w=800&q=80",
+                            ImageUrl = "https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=800&q=80",
                             IsActive = true,
                             Latitude = 41.04350m,
                             Longitude = 29.00810m,

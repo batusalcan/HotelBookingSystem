@@ -12,14 +12,29 @@ namespace HotelService.Controllers.v1;
 [Authorize]
 public class BookingsController(IBookingService bookingService) : ControllerBase
 {
+    private string GetUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? User.FindFirstValue("sub")
+        ?? throw new UnauthorizedAccessException("User identity not found in token");
+
     [HttpPost]
     public async Task<IActionResult> CreateBooking([FromBody] CreateBookingRequest request)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue("sub")
-            ?? throw new UnauthorizedAccessException("User identity not found in token");
-
-        var confirmation = await bookingService.CreateBookingAsync(request, userId, isAuthenticated: true);
+        var confirmation = await bookingService.CreateBookingAsync(request, GetUserId(), isAuthenticated: true);
         return Ok(ApiResponse<BookingConfirmationDto>.Ok(confirmation));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetUserBookings()
+    {
+        var bookings = await bookingService.GetUserBookingsAsync(GetUserId());
+        return Ok(ApiResponse<object>.Ok(bookings));
+    }
+
+    [HttpDelete("{bookingId:guid}")]
+    public async Task<IActionResult> CancelBooking(Guid bookingId)
+    {
+        await bookingService.CancelBookingAsync(bookingId, GetUserId());
+        return Ok(ApiResponse<object>.Ok(new { message = "Booking cancelled successfully." }));
     }
 }
