@@ -94,8 +94,8 @@ public class AiChatServiceTests
         var response = await sut.ProcessAsync(request, "user-1", "fake-token");
 
         Assert.True(response.RequiresConfirmation);
-        Assert.Equal("BOOK", response.ContextState?.PendingAction);
-        Assert.NotNull(response.ContextState?.RowVersion);
+        Assert.Equal("SELECT", response.ContextState?.PendingAction);
+        Assert.NotNull(response.ContextState?.HotelOptionsJson);
     }
 
     [Fact]
