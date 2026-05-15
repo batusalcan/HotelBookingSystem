@@ -10,6 +10,7 @@ public class Hotel
     public decimal? BaseRating { get; set; }
     public int TotalReviews { get; set; } = 0;
     public string? ImageUrl { get; set; }
+    public string? Description { get; set; }
     public bool IsActive { get; set; } = true;
 
     public ICollection<RoomType> RoomTypes { get; set; } = [];
