@@ -20,7 +20,11 @@ builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configurati
 // MongoDB — Singleton client, Scoped context
 builder.Services.AddSingleton<IMongoClient>(_ =>
 {
-    var settings = MongoClientSettings.FromConnectionString(config.GetConnectionString("MongoDB"));
+    var connStr = config.GetConnectionString("MongoDB") ?? string.Empty;
+    var isValid = connStr.StartsWith("mongodb://") || connStr.StartsWith("mongodb+srv://");
+    var settings = isValid
+        ? MongoClientSettings.FromConnectionString(connStr)
+        : new MongoClientSettings();
     settings.ServerSelectionTimeout = TimeSpan.FromSeconds(3);
     return new MongoClient(settings);
 });
