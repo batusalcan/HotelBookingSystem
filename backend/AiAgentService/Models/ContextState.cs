@@ -33,4 +33,8 @@ public class ContextState
 
     [JsonPropertyName("hotelName")]
     public string? HotelName { get; set; }
+
+    // Serialized List<HotelOptionDto> stored while user is choosing (PendingAction=="SELECT")
+    [JsonPropertyName("hotelOptionsJson")]
+    public string? HotelOptionsJson { get; set; }
 }

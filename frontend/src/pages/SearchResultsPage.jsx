@@ -45,6 +45,13 @@ export default function SearchResultsPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      <Link
+        to="/"
+        className="text-teal-600 text-sm font-medium hover:underline mb-5 inline-flex items-center gap-1"
+      >
+        ← Back to Home
+      </Link>
+
       {/* Header */}
       <div className="mb-6 flex items-start justify-between flex-wrap gap-3">
         <div>

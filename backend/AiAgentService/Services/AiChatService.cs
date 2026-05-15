@@ -14,27 +14,30 @@ public class AiChatService(
 {
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
+    // "book" removed — too ambiguous ("I want to book Hilton" ≠ final confirmation)
     private static readonly string[] ConfirmKeywords =
-        ["yes", "book it", "book", "confirm", "reserve", "sure", "ok", "yep", "yeah",
+        ["yes", "book it", "confirm", "reserve", "sure", "ok", "yep", "yeah",
          "evet", "onayla", "rezerve et", "rezervasyon yap"];
 
     /// <precondition>request.UserMessage is non-empty; userId is non-empty</precondition>
     /// <postcondition>
-    /// Returns ChatResponse with reply and updated contextState.
-    /// If contextState.PendingAction == "BOOK" and user confirms → booking executed.
-    /// If all search params present → hotels searched and presented (requiresConfirmation = true).
-    /// Otherwise → clarifying question returned (requiresConfirmation = false).
+    /// Three-step flow:
+    ///   1. SEARCH — Gemini extracts params → hotels presented, PendingAction="SELECT"
+    ///   2. SELECT — user picks a hotel by name/number → room detail fetched, PendingAction="BOOK"
+    ///   3. BOOK   — user confirms → booking executed
     /// </postcondition>
     public async Task<ChatResponse> ProcessAsync(ChatRequest request, string userId, string? authToken)
     {
-        // Step 1: Booking confirmation turn — no Gemini call needed
+        // Step BOOK: user is confirming a pre-selected hotel
         if (request.ContextState?.PendingAction == "BOOK" && IsConfirmation(request.UserMessage))
-        {
             return await ExecuteBookingAsync(request.ContextState, authToken);
-        }
 
-        // Step 2: Parse intent via Gemini
-        var prompt = BuildPrompt(request.UserMessage, request.ContextState, request.Messages);
+        // Step SELECT: user is choosing which hotel from the presented list
+        if (request.ContextState?.PendingAction == "SELECT")
+            return await HandleHotelSelectionAsync(request, authToken);
+
+        // Step SEARCH: parse intent via Gemini
+        var prompt = BuildSearchPrompt(request.UserMessage, request.ContextState, request.Messages);
         string aiRaw;
         try
         {
@@ -48,11 +51,8 @@ public class AiChatService(
 
         var intent = ParseIntent(aiRaw);
         if (intent is null)
-        {
             return Clarify("Could you give me a bit more detail? I need the destination, dates, and number of guests.", request.ContextState);
-        }
 
-        // Step 3: All params available → search hotels
         if (intent.Intent == "SEARCH"
             && intent.Destination is not null
             && intent.StartDate is not null
@@ -64,12 +64,85 @@ public class AiChatService(
             return await SearchAndPresentAsync(intent, startDate, endDate, authToken);
         }
 
-        // Step 4: Missing params → clarify
         return Clarify(intent.Reply ?? "Could you tell me the destination, check-in/out dates, and number of guests?",
             BuildPartialContext(intent));
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // ── Hotel selection step ──────────────────────────────────────────────────
+
+    private async Task<ChatResponse> HandleHotelSelectionAsync(ChatRequest request, string? authToken)
+    {
+        var hotels = DeserializeHotels(request.ContextState!.HotelOptionsJson);
+        if (hotels.Count == 0)
+            return Clarify("I lost track of the hotel options. Could you start your search again?", null);
+
+        var selectionPrompt = BuildSelectionPrompt(request.UserMessage, hotels);
+        string aiRaw;
+        try
+        {
+            aiRaw = await aiProvider.GenerateAsync(selectionPrompt);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AI provider call failed during hotel selection");
+            return Clarify("I'm having trouble right now. Which hotel would you like — say the name or number?", request.ContextState);
+        }
+
+        var selection = ParseSelection(aiRaw);
+        if (selection is null || selection.SelectedIndex < 0 || selection.SelectedIndex >= hotels.Count)
+        {
+            var relist = "Please tell me which hotel you'd like — say the hotel name or its number:\n\n" +
+                string.Join("\n", hotels.Select((h, i) => $"{i + 1}. {h.Name} — {h.PricePerNight:N0} TL/night ({h.RoomTypeName})"));
+            return Clarify(relist, request.ContextState);
+        }
+
+        var chosen = hotels[selection.SelectedIndex];
+
+        RoomDetailDto roomDetail;
+        try
+        {
+            roomDetail = await facade.GetRoomDetailAsync(
+                chosen.HotelId, chosen.RoomTypeId,
+                DateOnly.Parse(request.ContextState.StartDate!),
+                DateOnly.Parse(request.ContextState.EndDate!));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetRoomDetail failed for hotel {HotelId}", chosen.HotelId);
+            return Clarify("I couldn't confirm availability for that hotel. Please try another or search again.", request.ContextState);
+        }
+
+        var nights = DateOnly.Parse(request.ContextState.EndDate!).DayNumber
+                   - DateOnly.Parse(request.ContextState.StartDate!).DayNumber;
+        var total = chosen.PricePerNight * nights;
+
+        return new ChatResponse
+        {
+            Reply = $"Great choice! Here is your booking summary:\n\n" +
+                    $"🏨 **{chosen.Name}**\n" +
+                    $"🛏 Room: {chosen.RoomTypeName} | {chosen.PricePerNight:N0} TL/night\n" +
+                    $"📅 {request.ContextState.StartDate} → {request.ContextState.EndDate} ({nights} nights)\n" +
+                    $"👥 Guests: {request.ContextState.GuestCount}\n" +
+                    $"💰 Total: {total:N0} TL\n\n" +
+                    "Say **\"Yes, book it\"** to confirm your reservation.",
+            RequiresConfirmation = true,
+            ContextState = new ContextState
+            {
+                PendingAction = "BOOK",
+                Destination = request.ContextState.Destination,
+                StartDate = request.ContextState.StartDate,
+                EndDate = request.ContextState.EndDate,
+                GuestCount = request.ContextState.GuestCount,
+                TargetHotelId = chosen.HotelId,
+                TargetRoomTypeId = chosen.RoomTypeId,
+                TargetInventoryId = roomDetail.InventoryId,
+                RowVersion = roomDetail.RowVersion,
+                HotelName = chosen.Name
+            }
+        };
+    }
+
+    // ── Search and present ────────────────────────────────────────────────────
 
     private async Task<ChatResponse> SearchAndPresentAsync(
         GeminiIntent intent, DateOnly startDate, DateOnly endDate, string? authToken)
@@ -97,19 +170,6 @@ public class AiChatService(
             };
         }
 
-        // Get room detail for the top hotel to capture inventoryId + rowVersion
-        var top = hotels[0];
-        RoomDetailDto roomDetail;
-        try
-        {
-            roomDetail = await facade.GetRoomDetailAsync(top.HotelId, top.RoomTypeId, startDate, endDate);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Facade.GetRoomDetail failed for hotel {HotelId}", top.HotelId);
-            return Clarify("I found some hotels but couldn't retrieve availability details. Please try again.", null);
-        }
-
         var reply = FormatHotelOptions(hotels, intent.Destination!, startDate, endDate);
 
         return new ChatResponse
@@ -118,19 +178,17 @@ public class AiChatService(
             RequiresConfirmation = true,
             ContextState = new ContextState
             {
-                PendingAction = "BOOK",
+                PendingAction = "SELECT",
                 Destination = intent.Destination,
                 StartDate = startDate.ToString("yyyy-MM-dd"),
                 EndDate = endDate.ToString("yyyy-MM-dd"),
                 GuestCount = intent.GuestCount,
-                TargetHotelId = top.HotelId,
-                TargetRoomTypeId = top.RoomTypeId,
-                TargetInventoryId = roomDetail.InventoryId,
-                RowVersion = roomDetail.RowVersion,
-                HotelName = top.Name
+                HotelOptionsJson = JsonSerializer.Serialize(hotels, JsonOpts)
             }
         };
     }
+
+    // ── Execute booking ───────────────────────────────────────────────────────
 
     private async Task<ChatResponse> ExecuteBookingAsync(ContextState context, string? authToken)
     {
@@ -150,8 +208,8 @@ public class AiChatService(
             logger.LogInformation("AI booking confirmed BookingId={BookingId}", result.BookingId);
             return new ChatResponse
             {
-                Reply = $"Your reservation at {context.HotelName} from {context.StartDate} to {context.EndDate} " +
-                        $"is confirmed! Booking ID: {result.BookingId}.",
+                Reply = $"✅ Your reservation at **{context.HotelName}** from {context.StartDate} to {context.EndDate} " +
+                        $"is confirmed!\n\nBooking ID: `{result.BookingId}`",
                 RequiresConfirmation = false,
                 ContextState = null
             };
@@ -177,7 +235,9 @@ public class AiChatService(
         }
     }
 
-    private static string BuildPrompt(string userMessage, ContextState? context, List<ChatMessage>? history)
+    // ── Prompt builders ───────────────────────────────────────────────────────
+
+    private static string BuildSearchPrompt(string userMessage, ContextState? context, List<ChatMessage>? history)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
         var sb = new StringBuilder();
@@ -229,6 +289,23 @@ public class AiChatService(
         return sb.ToString();
     }
 
+    private static string BuildSelectionPrompt(string userMessage, List<HotelOptionDto> hotels)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("A user was shown a list of hotels and is now choosing one.");
+        sb.AppendLine("Return ONLY valid JSON (no markdown): {\"selectedIndex\": N, \"reply\": \"...\"}");
+        sb.AppendLine("selectedIndex is 0-based. Return -1 if the user is not making a clear hotel selection.");
+        sb.AppendLine();
+        sb.AppendLine("Available hotels:");
+        for (int i = 0; i < hotels.Count; i++)
+            sb.AppendLine($"{i + 1}. {hotels[i].Name} ({hotels[i].Location}) — {hotels[i].PricePerNight:N0} TL/night ({hotels[i].RoomTypeName})");
+        sb.AppendLine();
+        sb.AppendLine($"User said: \"{userMessage}\"");
+        return sb.ToString();
+    }
+
+    // ── Format helpers ────────────────────────────────────────────────────────
+
     private static string FormatHotelOptions(
         List<HotelOptionDto> hotels, string destination, DateOnly startDate, DateOnly endDate)
     {
@@ -241,19 +318,20 @@ public class AiChatService(
         {
             sb.AppendLine($"🏨 {h.Name} — {h.Location}");
             sb.AppendLine($"   ⭐ {h.Rating}/10 ({h.TotalReviews} reviews) | 💰 {h.PricePerNight:N0} TL/night");
-            sb.AppendLine($"   Room type: {h.RoomTypeName} | Available rooms: {h.AvailableRooms}");
+            sb.AppendLine($"   Room: {h.RoomTypeName} | Available rooms: {h.AvailableRooms}");
             sb.AppendLine();
         }
 
-        sb.AppendLine($"Would you like to confirm a reservation at {hotels[0].Name}? Just say \"Yes, book it\".");
+        sb.AppendLine("Which hotel would you like? Say the hotel name or its number (1, 2, etc.).");
         return sb.ToString().TrimEnd();
     }
+
+    // ── Parsers ───────────────────────────────────────────────────────────────
 
     private static GeminiIntent? ParseIntent(string raw)
     {
         try
         {
-            // Strip markdown code fences if present
             var json = raw.Trim();
             if (json.StartsWith("```"))
             {
@@ -261,13 +339,25 @@ public class AiChatService(
                 var end = json.LastIndexOf("```");
                 if (end > start) json = json[start..end].Trim();
             }
-
             return JsonSerializer.Deserialize<GeminiIntent>(json, JsonOpts);
         }
-        catch
+        catch { return null; }
+    }
+
+    private static HotelSelection? ParseSelection(string raw)
+    {
+        try
         {
-            return null;
+            var json = raw.Trim();
+            if (json.StartsWith("```"))
+            {
+                var start = json.IndexOf('\n') + 1;
+                var end = json.LastIndexOf("```");
+                if (end > start) json = json[start..end].Trim();
+            }
+            return JsonSerializer.Deserialize<HotelSelection>(json, JsonOpts);
         }
+        catch { return null; }
     }
 
     private static bool IsConfirmation(string message)
@@ -276,17 +366,25 @@ public class AiChatService(
         return ConfirmKeywords.Any(k => lower.Contains(k));
     }
 
+    private static List<HotelOptionDto> DeserializeHotels(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return [];
+        try { return JsonSerializer.Deserialize<List<HotelOptionDto>>(json, JsonOpts) ?? []; }
+        catch { return []; }
+    }
+
     private static ChatResponse Clarify(string reply, ContextState? carry) => new()
     {
         Reply = reply,
         RequiresConfirmation = false,
         ContextState = carry is null ? null : new ContextState
         {
-            PendingAction = "CLARIFY",
+            PendingAction = carry.PendingAction == "SELECT" ? "SELECT" : "CLARIFY",
             Destination = carry.Destination,
             StartDate = carry.StartDate,
             EndDate = carry.EndDate,
-            GuestCount = carry.GuestCount
+            GuestCount = carry.GuestCount,
+            HotelOptionsJson = carry.HotelOptionsJson
         }
     };
 
@@ -299,12 +397,16 @@ public class AiChatService(
         GuestCount = intent.GuestCount
     };
 
-    // ── Gemini JSON response shape ────────────────────────────────────────────
+    // ── Gemini response shapes ────────────────────────────────────────────────
     private record GeminiIntent(
         [property: JsonPropertyName("intent")] string Intent,
         [property: JsonPropertyName("destination")] string? Destination,
         [property: JsonPropertyName("startDate")] string? StartDate,
         [property: JsonPropertyName("endDate")] string? EndDate,
         [property: JsonPropertyName("guestCount")] int? GuestCount,
+        [property: JsonPropertyName("reply")] string? Reply);
+
+    private record HotelSelection(
+        [property: JsonPropertyName("selectedIndex")] int SelectedIndex,
         [property: JsonPropertyName("reply")] string? Reply);
 }
