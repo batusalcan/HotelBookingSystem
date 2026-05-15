@@ -40,11 +40,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
-});
 builder.Services.AddOcelot(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -76,7 +71,22 @@ app.Use(async (ctx, next) =>
 });
 
 app.UseSerilogRequestLogging();
-app.UseCors();
+
+// Intercept CORS preflight before Ocelot sees it.
+// app.UseCors() does not short-circuit OPTIONS for Ocelot routes (no endpoint metadata),
+// so we handle it explicitly here.
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["Access-Control-Allow-Origin"] = "*";
+    ctx.Response.Headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS";
+    ctx.Response.Headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, X-Correlation-Id";
+    if (ctx.Request.Method == "OPTIONS")
+    {
+        ctx.Response.StatusCode = 200;
+        return;
+    }
+    await next();
+});
 
 // Authentication and authorization must run before Ocelot so that routes
 // with AuthenticationOptions can call context.AuthenticateAsync("Bearer").

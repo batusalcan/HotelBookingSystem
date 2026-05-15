@@ -28,7 +28,8 @@ public class HotelSearchService(
             ? new AuthenticatedPricingStrategy()
             : new GuestPricingStrategy();
 
-        var cacheKey = $"search:{request.Destination.ToLower()}:{request.StartDate:yyyy-MM-dd}:{request.EndDate:yyyy-MM-dd}:{request.GuestCount}";
+        // v2: prefix busts any pre-deduplication cache entries
+        var cacheKey = $"v2:search:{request.Destination.ToLower()}:{request.StartDate:yyyy-MM-dd}:{request.EndDate:yyyy-MM-dd}:{request.GuestCount}";
         var cached = await cache.GetAsync(cacheKey);
 
         List<HotelSearchResult> allResults;
@@ -46,6 +47,12 @@ public class HotelSearchService(
             var ttlMinutes = int.Parse(config["Cache:SearchTtlMinutes"] ?? "15");
             await cache.SetAsync(cacheKey, JsonSerializer.Serialize(allResults, JsonOpts), TimeSpan.FromMinutes(ttlMinutes));
         }
+
+        // Dedup here (not inside QuerySqlAsync) so cached data is also deduplicated
+        allResults = allResults
+            .GroupBy(r => r.HotelId)
+            .Select(g => g.OrderBy(r => r.PricePerNight).First())
+            .ToList();
 
         // Apply pricing strategy at response time — NEVER cache discounted prices
         var priced = allResults.Select(r => r with { PricePerNight = pricing.Apply(r.PricePerNight) }).ToList();
@@ -83,10 +90,6 @@ public class HotelSearchService(
             .AsNoTracking()
             .ToListAsync();
 
-        // One card per hotel — show the cheapest available room type as the starting price
-        return rows
-            .GroupBy(r => r.HotelId)
-            .Select(g => g.OrderBy(r => r.PricePerNight).First())
-            .ToList();
+        return rows;
     }
 }
