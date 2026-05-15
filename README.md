@@ -95,7 +95,7 @@ Full entity-relationship documentation: [docs/Database-Design-ER-Modeling.md](do
 
 **RoomTypes** — `RoomTypeId` (PK), `HotelId` (FK), `TypeName`, `MaxGuests`, `BasePricePerNight`
 
-**InventoryBlocks** — `InventoryId` (PK), `RoomTypeId` (FK), `StartDate`, `EndDate`, `TotalCount`, `AvailableCount`, `IsAvailable`, `RowVersion` (concurrency token)
+**InventoryBlocks** — `InventoryId` (PK), `RoomTypeId` (FK), `StartDate`, `EndDate`, `TotalCount`, `AvailableCount`, `IsAvailable`, `xmin` (PostgreSQL system column, concurrency token)
 
 **Bookings** — `BookingId` (PK), `UserId` (JWT sub, no FK), `HotelId` (soft ref), `RoomTypeId` (soft ref), `CheckInDate`, `CheckOutDate`, `GuestCount`, `TotalAmount`, `Status`, `CreatedAt`
 
@@ -124,7 +124,7 @@ Admin, Search, and Booking were merged into one `HotelService` to simplify deplo
 Discount prices are **never cached**. Redis stores base prices only. The discount is computed at the service layer when a valid `Authorization: Bearer` JWT header is detected, keeping the cache provider-agnostic.
 
 ### 4. Optimistic Concurrency for Overbooking Prevention
-`InventoryBlocks.RowVersion` is a SQL `rowversion` / `timestamp` column mapped as an EF Core concurrency token. The client reads the `rowVersion` when fetching room details and submits it with the booking request. If another booking changes the row in the meantime, EF Core throws `DbUpdateConcurrencyException` → API returns `409 Conflict`.
+`InventoryBlocks.xmin` is PostgreSQL's built-in `xmin` system column mapped as an EF Core concurrency token. The client reads the `rowVersion` when fetching room details and submits it with the booking request. If another booking changes the row in the meantime, EF Core throws `DbUpdateConcurrencyException` → API returns `409 Conflict`.
 
 ### 5. AI Provider Abstraction
 The `IAiProvider` interface decouples business logic from the Gemini SDK. Switching to a different AI provider (OpenAI, Anthropic, Azure OpenAI) only requires:

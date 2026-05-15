@@ -6,6 +6,9 @@ export const searchHotels = (params) =>
 export const getHotelDetail = (hotelId) =>
   client.get(`/hotels/${hotelId}`)
 
+export const getHotelRoomTypes = (hotelId) =>
+  client.get(`/hotels/${hotelId}/roomtypes`)
+
 export const getRoomDetail = (hotelId, roomTypeId, params) =>
   client.get(`/hotels/${hotelId}/rooms/${roomTypeId}`, { params })
 

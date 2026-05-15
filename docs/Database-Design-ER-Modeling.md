@@ -291,22 +291,20 @@ Each document in the collection represents the full review state for one hotel, 
 ### Cached Search Result Value Structure
 
 ```json
-{
-  "cachedAt": "2026-05-10T14:00:00Z",
-  "results": [
-    {
-      "hotelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-      "name": "Hyde Bodrum",
-      "destination": "Bodrum, Muğla",
-      "coordinates": { "lat": 37.034, "lng": 27.43 },
-      "basePricePerNight": 10948.0,
-      "availableRooms": 2,
-      "baseRating": 9.6,
-      "totalReviews": 163,
-      "roomTypeId": "room-type-uuid-123"
-    }
-  ]
-}
+[
+  {
+    "hotelId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "name": "Hyde Bodrum",
+    "destination": "Bodrum, Muğla",
+    "latitude": 37.034,
+    "longitude": 27.43,
+    "pricePerNight": 10948.0,
+    "availableRooms": 2,
+    "rating": 9.6,
+    "totalReviews": 163,
+    "roomTypeId": "room-type-uuid-123"
+  }
+]
 ```
 
 > **Note on Pricing:** Base prices (without discount) are stored in Redis. The 15% discount is **never cached** — it is applied at the service layer at response time based on the JWT presence in the request header. This prevents a cached discounted price being served to a non-authenticated user.

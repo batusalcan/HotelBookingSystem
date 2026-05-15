@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { getRoomDetail, adminGetRoomTypes, createBooking } from '../api/hotelApi'
+import { getRoomDetail, getHotelRoomTypes, createBooking } from '../api/hotelApi'
 import { useAuth } from '../context/AuthContext'
 import CommentSection from '../components/CommentSection'
 
@@ -22,7 +22,7 @@ export default function HotelDetailPage() {
   const [bookingError, setBookingError] = useState('')
 
   useEffect(() => {
-    adminGetRoomTypes(hotelId)
+    getHotelRoomTypes(hotelId)
       .then(({ data }) => setRoomTypes(Array.isArray(data) ? data : data.data ?? []))
       .catch(() => setRoomTypes([]))
   }, [hotelId])

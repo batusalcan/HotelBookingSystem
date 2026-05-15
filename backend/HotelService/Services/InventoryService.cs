@@ -40,7 +40,8 @@ public class InventoryService(
             Destination = request.Destination,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
-            ImageUrl = request.ImageUrl
+            ImageUrl = request.ImageUrl,
+            BaseRating = request.BaseRating
         };
         db.Hotels.Add(hotel);
         await SaveAsync();
