@@ -129,10 +129,10 @@ app.Use(async (ctx, next) =>
     }
 });
 
+app.UseCors();
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Hotel Comments Service v1"));
 
-app.UseCors();
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
