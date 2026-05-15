@@ -34,8 +34,8 @@ export default function AiChatWidget() {
         contextState,
         messages: messages.map((m) => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text })),
       })
-      setMessages((m) => [...m, { role: 'ai', text: data.reply }])
-      setContextState(data.contextState ?? null)
+      setMessages((m) => [...m, { role: 'ai', text: data.data.reply }])
+      setContextState(data.data.contextState ?? null)
     } catch {
       setMessages((m) => [...m, { role: 'ai', text: 'Sorry, something went wrong. Please try again.' }])
     } finally {
