@@ -11,9 +11,9 @@ const DEST_GALLERY = {
     'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600&q=70',
   ],
   izmir: [
-    'https://images.unsplash.com/photo-1566073771259-d14b3b97e91e?w=600&q=70',
-    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&q=70',
     'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=600&q=70',
+    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&q=70',
+    'https://images.unsplash.com/photo-1527838832700-5059252407fa?w=600&q=70',
   ],
   bodrum: [
     'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=600&q=70',
@@ -22,7 +22,7 @@ const DEST_GALLERY = {
   ],
   antalya: [
     'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=600&q=70',
-    'https://images.unsplash.com/photo-1566073771259-d14b3b97e91e?w=600&q=70',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600&q=70',
     'https://images.unsplash.com/photo-1535827841776-24afc1e255ac?w=600&q=70',
   ],
 }
@@ -172,6 +172,9 @@ export default function HotelDetailPage() {
               <h1 className="text-2xl font-bold text-slate-800">{hotelName}</h1>
               {hotelLocation && (
                 <p className="text-slate-500 text-sm mt-1">📍 {hotelLocation}</p>
+              )}
+              {hotelFromSearch?.description && (
+                <p className="text-slate-600 text-sm mt-3 leading-relaxed max-w-xl">{hotelFromSearch.description}</p>
               )}
               {startDate && endDate && (
                 <p className="text-slate-400 text-sm mt-0.5">

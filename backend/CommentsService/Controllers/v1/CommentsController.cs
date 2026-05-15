@@ -42,6 +42,8 @@ public class CommentsController(IHotelCommentsService commentsService, ILogger<C
 
         var userName = User.FindFirstValue("name")
             ?? User.FindFirstValue(ClaimTypes.Name)
+            ?? User.FindFirstValue("email")
+            ?? User.FindFirstValue(ClaimTypes.Email)
             ?? "Anonymous";
 
         logger.LogInformation("User {UserId} submitting review for hotel {HotelId}", userId, hotelId);

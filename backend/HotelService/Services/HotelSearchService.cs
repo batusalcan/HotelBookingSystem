@@ -80,6 +80,7 @@ public class HotelSearchService(
                 Location = i.RoomType.Hotel.Destination,
                 Coordinates = new CoordinatesDto { Lat = i.RoomType.Hotel.Latitude, Lng = i.RoomType.Hotel.Longitude },
                 ImageUrl = i.RoomType.Hotel.ImageUrl,
+                Description = i.RoomType.Hotel.Description,
                 RoomTypeId = i.RoomTypeId,
                 RoomTypeName = i.RoomType.TypeName,
                 PricePerNight = i.RoomType.BasePricePerNight,

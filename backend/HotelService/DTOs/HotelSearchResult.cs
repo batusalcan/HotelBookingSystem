@@ -7,6 +7,7 @@ public record HotelSearchResult
     public string Location { get; set; } = string.Empty;
     public CoordinatesDto Coordinates { get; set; } = new();
     public string? ImageUrl { get; set; }
+    public string? Description { get; set; }
     public Guid RoomTypeId { get; set; }
     public string RoomTypeName { get; set; } = string.Empty;
     public decimal PricePerNight { get; set; }

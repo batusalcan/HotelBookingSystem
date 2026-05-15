@@ -31,6 +31,9 @@ namespace HotelService.Data.Migrations.Catalog
                     b.Property<decimal?>("BaseRating")
                         .HasColumnType("decimal(3,1)");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
                     b.Property<string>("Destination")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -69,10 +72,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000001"),
                             BaseRating = 9.2m,
+                            Description = "Perched above the Bosphorus Strait with panoramic views of two continents, Swissôtel The Bosphorus combines Swiss precision with Istanbul's timeless elegance. The hotel features award-winning spa facilities, multiple fine-dining restaurants, and a rooftop infinity pool overlooking the historic skyline.",
                             Destination = "Istanbul",
+                            ImageUrl = "https://images.unsplash.com/photo-1560347876-aeef00ee58a1?w=800&q=80",
                             IsActive = true,
-                            Latitude = 41.0423m,
-                            Longitude = 29.0082m,
+                            Latitude = 41.04350m,
+                            Longitude = 29.00810m,
                             Name = "Swissôtel The Bosphorus Istanbul",
                             TotalReviews = 1284
                         },
@@ -80,10 +85,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000002"),
                             BaseRating = 8.8m,
+                            Description = "Located in Istanbul's vibrant Bomonti district, this modern high-rise hotel offers sweeping city views from its Sky Bar and rooftop pool. With spacious contemporary rooms, a fully equipped fitness center, and direct access to local nightlife, it's the ideal urban retreat.",
                             Destination = "Istanbul",
+                            ImageUrl = "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80",
                             IsActive = true,
-                            Latitude = 41.0603m,
-                            Longitude = 28.9844m,
+                            Latitude = 41.06110m,
+                            Longitude = 28.98360m,
                             Name = "Hilton Istanbul Bomonti",
                             TotalReviews = 876
                         },
@@ -91,10 +98,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000003"),
                             BaseRating = 9.0m,
+                            Description = "Izmir's most iconic luxury hotel, the Büyük Efes sits in the heart of the city overlooking the Gulf of İzmir. The landmark property features beautifully appointed rooms, a grand swimming pool, and is steps away from the lively Kordon waterfront promenade.",
                             Destination = "Izmir",
+                            ImageUrl = "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&q=80",
                             IsActive = true,
-                            Latitude = 38.4192m,
-                            Longitude = 27.1287m,
+                            Latitude = 38.41920m,
+                            Longitude = 27.12610m,
                             Name = "Swissôtel Büyük Efes Izmir",
                             TotalReviews = 643
                         },
@@ -102,10 +111,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000004"),
                             BaseRating = 9.6m,
+                            Description = "An exclusive adults-only retreat set on the crystal-clear waters of the Bodrum Peninsula. Hyde Bodrum offers private beach access, sunset cocktail terraces, and a serene infinity pool, creating a sophisticated escape where style meets the Aegean Sea.",
                             Destination = "Bodrum",
+                            ImageUrl = "https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80",
                             IsActive = true,
-                            Latitude = 37.0344m,
-                            Longitude = 27.4305m,
+                            Latitude = 37.03380m,
+                            Longitude = 27.43060m,
                             Name = "Hyde Bodrum - Yetişkin Oteli",
                             TotalReviews = 163
                         },
@@ -113,10 +124,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000005"),
                             BaseRating = 9.4m,
+                            Description = "Nestled in the exclusive marina of Yalıkavak, this boutique MGallery property captures the charm of traditional Bodrum architecture with world-class amenities. Enjoy private sea access, a tranquil spa, and gourmet dining with views of luxury yachts and the Aegean.",
                             Destination = "Bodrum",
+                            ImageUrl = "https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=800&q=80",
                             IsActive = true,
-                            Latitude = 37.1041m,
-                            Longitude = 27.2866m,
+                            Latitude = 37.10430m,
+                            Longitude = 27.28170m,
                             Name = "MGallery The Bodrum Hotel Yalıkavak",
                             TotalReviews = 302
                         },
@@ -124,10 +137,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000006"),
                             BaseRating = 9.1m,
+                            Description = "A grand beachfront resort on the Belek Riviera, Regnum Carya combines championship golf courses, a sprawling water park, and an award-winning spa. With multiple pools, private beach, and all-inclusive dining options, this is Antalya's premier family and leisure destination.",
                             Destination = "Antalya",
+                            ImageUrl = "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80",
                             IsActive = true,
-                            Latitude = 36.8531m,
-                            Longitude = 30.7512m,
+                            Latitude = 36.85740m,
+                            Longitude = 30.75300m,
                             Name = "Regnum Carya Golf & Spa Resort",
                             TotalReviews = 529
                         },
@@ -135,10 +150,12 @@ namespace HotelService.Data.Migrations.Catalog
                         {
                             HotelId = new Guid("11111111-0000-0000-0000-000000000007"),
                             BaseRating = 9.3m,
+                            Description = "Rixos Premium Belek sets the standard for Turkish Riviera luxury with its extensive Ultra All-Inclusive concept. Set among lush pine forests steps from the Mediterranean, guests enjoy multiple pools, a private beach, a top-tier spa, and over 20 restaurants and bars.",
                             Destination = "Antalya",
+                            ImageUrl = "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80",
                             IsActive = true,
-                            Latitude = 36.8642m,
-                            Longitude = 31.0667m,
+                            Latitude = 36.86980m,
+                            Longitude = 31.06490m,
                             Name = "Rixos Premium Belek",
                             TotalReviews = 1102
                         });
