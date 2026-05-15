@@ -40,10 +40,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-
 builder.Services.AddOcelot(builder.Configuration);
-builder.Services.AddSwaggerForOcelot(builder.Configuration);
-
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -78,23 +77,40 @@ app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Aggregated Swagger UI at /swagger/index.html — merges all downstream service docs
-app.UseSwaggerForOcelotUI(opt =>
+// Swagger UI aggregates all downstream service docs via direct URLs
+app.UseSwaggerUI(c =>
 {
-    opt.PathToSwaggerGenerator = "/swagger/docs";
+    c.SwaggerEndpoint(
+        "https://hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net/swagger/v1/swagger.json",
+        "Hotel Service v1");
+    c.SwaggerEndpoint(
+        "https://hotel-comments-c9ejhwftbch5eqey.italynorth-01.azurewebsites.net/swagger/v1/swagger.json",
+        "Comments Service v1");
+    c.SwaggerEndpoint(
+        "https://hotel-aiagent-g2avhjfcfyhqcsfd.italynorth-01.azurewebsites.net/swagger/v1/swagger.json",
+        "AI Agent Service v1");
+    c.RoutePrefix = "swagger";
 });
 
-app.MapHealthChecks("/health", new HealthCheckOptions
+// Health check must be handled before Ocelot intercepts the request
+app.MapWhen(ctx => ctx.Request.Path.StartsWithSegments("/health"), healthApp =>
 {
-    ResponseWriter = async (ctx, report) =>
+    healthApp.UseRouting();
+    healthApp.UseEndpoints(endpoints =>
     {
-        ctx.Response.ContentType = "application/json";
-        await ctx.Response.WriteAsJsonAsync(new
+        endpoints.MapHealthChecks("/health", new HealthCheckOptions
         {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() })
+            ResponseWriter = async (ctx, report) =>
+            {
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsJsonAsync(new
+                {
+                    status = report.Status.ToString(),
+                    checks = report.Entries.Select(e => new { name = e.Key, status = e.Value.Status.ToString() })
+                });
+            }
         });
-    }
+    });
 });
 
 await app.UseOcelot();

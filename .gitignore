@@ -3,6 +3,9 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# Build artifacts
+*.zip
+
 # dotenv files
 .env
 .env.*
