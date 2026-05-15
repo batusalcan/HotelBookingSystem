@@ -38,6 +38,7 @@ export default function HotelCard({ hotel, searchParams }) {
           </div>
           <Link
             to={`/hotels/${hotel.hotelId}${qs}`}
+            state={{ hotel }}
             className="bg-teal-600 text-white px-5 py-2 rounded-xl font-semibold hover:bg-teal-700 transition text-sm shadow-sm"
           >
             View Details

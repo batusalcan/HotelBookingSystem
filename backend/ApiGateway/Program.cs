@@ -40,6 +40,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+});
 builder.Services.AddOcelot(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -71,6 +76,7 @@ app.Use(async (ctx, next) =>
 });
 
 app.UseSerilogRequestLogging();
+app.UseCors();
 
 // Authentication and authorization must run before Ocelot so that routes
 // with AuthenticationOptions can call context.AuthenticateAsync("Bearer").

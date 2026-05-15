@@ -1,14 +1,51 @@
 import { useState, useEffect } from 'react'
-import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { getRoomDetail, getHotelRoomTypes, createBooking } from '../api/hotelApi'
 import { useAuth } from '../context/AuthContext'
 import CommentSection from '../components/CommentSection'
+
+const DEST_GALLERY = {
+  istanbul: [
+    'https://images.unsplash.com/photo-1527838832700-5059252407fa?w=600&q=70',
+    'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=600&q=70',
+    'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=600&q=70',
+  ],
+  izmir: [
+    'https://images.unsplash.com/photo-1566073771259-d14b3b97e91e?w=600&q=70',
+    'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=600&q=70',
+    'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=600&q=70',
+  ],
+  bodrum: [
+    'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=600&q=70',
+    'https://images.unsplash.com/photo-1540541338287-41700207dee6?w=600&q=70',
+    'https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=600&q=70',
+  ],
+  antalya: [
+    'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=600&q=70',
+    'https://images.unsplash.com/photo-1566073771259-d14b3b97e91e?w=600&q=70',
+    'https://images.unsplash.com/photo-1535827841776-24afc1e255ac?w=600&q=70',
+  ],
+}
+
+function getGallery(hotel) {
+  if (!hotel) return []
+  const key = Object.keys(DEST_GALLERY).find((k) =>
+    hotel.location?.toLowerCase().includes(k) || hotel.destination?.toLowerCase().includes(k)
+  )
+  const extras = key ? DEST_GALLERY[key] : DEST_GALLERY.istanbul
+  const main = hotel.imageUrl
+  if (main) return [main, ...extras.slice(0, 3)]
+  return extras.slice(0, 3)
+}
 
 export default function HotelDetailPage() {
   const { hotelId } = useParams()
   const [searchParams] = useSearchParams()
   const { session } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const hotelFromSearch = location.state?.hotel
 
   const startDate  = searchParams.get('startDate') || ''
   const endDate    = searchParams.get('endDate') || ''
@@ -20,6 +57,9 @@ export default function HotelDetailPage() {
   const [loadingRoom, setLoadingRoom] = useState(false)
   const [booking, setBooking] = useState(false)
   const [bookingError, setBookingError] = useState('')
+  const [activePhoto, setActivePhoto] = useState(0)
+
+  const gallery = getGallery(hotelFromSearch)
 
   useEffect(() => {
     getHotelRoomTypes(hotelId)
@@ -78,6 +118,11 @@ export default function HotelDetailPage() {
     return session ? (base * 0.85).toFixed(0) : base.toFixed(0)
   }
 
+  const hotelName     = hotelFromSearch?.name     ?? 'Hotel Detail'
+  const hotelLocation = hotelFromSearch?.location ?? hotelFromSearch?.destination ?? ''
+  const hotelRating   = hotelFromSearch?.rating
+  const hotelReviews  = hotelFromSearch?.totalReviews
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
@@ -88,21 +133,61 @@ export default function HotelDetailPage() {
       </Link>
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-6">
-        {/* Hotel image placeholder */}
-        <div className="h-56 bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center">
-          <span className="text-7xl">🏨</span>
-        </div>
+        {/* Photo gallery */}
+        {gallery.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            <div className="relative h-64 sm:h-80 overflow-hidden bg-slate-100">
+              <img
+                src={gallery[activePhoto]}
+                alt={hotelName}
+                className="w-full h-full object-cover transition-opacity duration-300"
+                onError={(e) => { e.target.style.display = 'none' }}
+              />
+            </div>
+            {gallery.length > 1 && (
+              <div className="flex gap-1 px-1 pb-1">
+                {gallery.map((src, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActivePhoto(i)}
+                    className={`flex-1 h-20 overflow-hidden rounded-lg border-2 transition ${
+                      i === activePhoto ? 'border-teal-500' : 'border-transparent opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img src={src} alt="" className="w-full h-full object-cover" onError={(e) => { e.target.parentElement.style.display = 'none' }} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-56 bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center">
+            <span className="text-7xl">🏨</span>
+          </div>
+        )}
 
         <div className="p-6">
           <div className="flex items-start justify-between flex-wrap gap-3 mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-800">Hotel Detail</h1>
+              <h1 className="text-2xl font-bold text-slate-800">{hotelName}</h1>
+              {hotelLocation && (
+                <p className="text-slate-500 text-sm mt-1">📍 {hotelLocation}</p>
+              )}
               {startDate && endDate && (
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-slate-400 text-sm mt-0.5">
                   {startDate} → {endDate} · {guestCount} {guestCount === 1 ? 'guest' : 'guests'} · {nights} {nights === 1 ? 'night' : 'nights'}
                 </p>
               )}
             </div>
+            {hotelRating && (
+              <div className="flex items-center gap-2">
+                <span className="bg-teal-600 text-white px-3 py-1 rounded-lg font-bold text-lg">{hotelRating?.toFixed(1)}</span>
+                <div className="text-xs text-slate-500">
+                  <div className="font-semibold text-slate-700">Excellent</div>
+                  <div>{hotelReviews?.toLocaleString()} reviews</div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Discount banner */}
@@ -140,6 +225,11 @@ export default function HotelDetailPage() {
                   <div className="text-slate-400 text-xs mt-1">Up to {rt.maxGuests} guests</div>
                   {price && (
                     <div className="mt-3">
+                      {session && (
+                        <div className="text-xs text-slate-400 line-through mb-0.5">
+                          {rt.basePricePerNight.toFixed(0)} TL / night
+                        </div>
+                      )}
                       <span className="text-xl font-extrabold text-slate-800">{price} TL</span>
                       <span className="text-slate-400 text-xs"> / night</span>
                       {nights > 1 && (
@@ -157,6 +247,7 @@ export default function HotelDetailPage() {
             <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
               <h4 className="font-bold text-slate-700 mb-3">Booking Summary</h4>
               <div className="text-sm text-slate-600 flex flex-col gap-1.5 mb-4">
+                <div><span className="font-semibold text-slate-700">Hotel:</span> {hotelName}</div>
                 <div><span className="font-semibold text-slate-700">Room:</span> {selectedRoom.typeName}</div>
                 <div><span className="font-semibold text-slate-700">Dates:</span> {startDate} → {endDate}</div>
                 <div><span className="font-semibold text-slate-700">Guests:</span> {guestCount}</div>

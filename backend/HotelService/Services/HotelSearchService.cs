@@ -58,7 +58,7 @@ public class HotelSearchService(
 
     private async Task<List<HotelSearchResult>> QuerySqlAsync(HotelSearchRequest request)
     {
-        return await db.InventoryBlocks
+        var rows = await db.InventoryBlocks
             .Where(i => i.IsAvailable
                      && i.AvailableCount > 0
                      && i.RoomType.MaxGuests >= request.GuestCount
@@ -72,6 +72,7 @@ public class HotelSearchService(
                 Name = i.RoomType.Hotel.Name,
                 Location = i.RoomType.Hotel.Destination,
                 Coordinates = new CoordinatesDto { Lat = i.RoomType.Hotel.Latitude, Lng = i.RoomType.Hotel.Longitude },
+                ImageUrl = i.RoomType.Hotel.ImageUrl,
                 RoomTypeId = i.RoomTypeId,
                 RoomTypeName = i.RoomType.TypeName,
                 PricePerNight = i.RoomType.BasePricePerNight,
@@ -81,5 +82,11 @@ public class HotelSearchService(
             })
             .AsNoTracking()
             .ToListAsync();
+
+        // One card per hotel — show the cheapest available room type as the starting price
+        return rows
+            .GroupBy(r => r.HotelId)
+            .Select(g => g.OrderBy(r => r.PricePerNight).First())
+            .ToList();
     }
 }
