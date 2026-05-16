@@ -82,6 +82,40 @@ public class AdminController(IInventoryService inventoryService) : ControllerBas
         return Ok(ApiResponse<string>.Ok("Inventory updated successfully"));
     }
 
+    [HttpGet("debug-auth")]
+    public IActionResult DebugAuth()
+    {
+        var auth = Request.Headers.Authorization.ToString();
+        string? error = null;
+        string? appMetaRaw = null;
+        bool adminResult = false;
+        try
+        {
+            var seg = auth["Bearer ".Length..].Trim().Split('.')[1]
+                .Replace('-', '+').Replace('_', '/');
+            seg += new string('=', (4 - seg.Length % 4) % 4);
+            var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(seg));
+            var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("app_metadata", out var meta))
+            {
+                appMetaRaw = meta.GetRawText();
+                if (meta.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
+                    adminResult = roles.EnumerateArray().Any(r => r.GetString() == "admin");
+            }
+        }
+        catch (Exception ex) { error = ex.Message; }
+
+        return Ok(new
+        {
+            authHeaderLength = auth.Length,
+            startsWithBearer = auth.StartsWith("Bearer "),
+            appMetaRaw,
+            adminResult,
+            error,
+            claims = User.Claims.Select(c => new { c.Type, c.Value }).Take(10).ToList()
+        });
+    }
+
     /// <summary>Internal endpoint for NotificationService nightly cron — not exposed via API Gateway.</summary>
     [AllowAnonymous]
     [HttpGet("hotels/capacity-report")]

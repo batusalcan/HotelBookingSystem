@@ -16,6 +16,17 @@
     },
 
     {
+      "UpstreamPathTemplate": "/gateway/v1/admin/debug-auth",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/v1/admin/debug-auth",
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
+      "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": { "AuthenticationProviderKey": "Bearer", "AllowedScopes": [] },
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
       "UpstreamPathTemplate": "/gateway/v1/admin/hotels",
       "UpstreamHttpMethod": [ "GET", "POST" ],
       "DownstreamPathTemplate": "/api/v1/admin/hotels",
