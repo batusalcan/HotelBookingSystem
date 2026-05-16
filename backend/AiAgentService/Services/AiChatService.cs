@@ -51,8 +51,8 @@ public class AiChatService(
         try { aiRaw = await aiProvider.GenerateAsync(prompt); }
         catch (Exception ex)
         {
-            logger.LogError(ex, "AI provider call failed");
-            return Clarify("I'm having trouble right now. Could you rephrase your request?", request.ContextState);
+            logger.LogError(ex, "AI provider call failed: {Type} — {Message}", ex.GetType().Name, ex.Message);
+            return Clarify($"I'm having trouble right now ({ex.GetType().Name}). Could you rephrase your request?", request.ContextState);
         }
 
         var intent = ParseIntent(aiRaw);
