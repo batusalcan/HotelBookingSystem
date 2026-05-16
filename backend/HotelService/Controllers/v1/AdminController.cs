@@ -58,6 +58,14 @@ public class AdminController(IInventoryService inventoryService) : ControllerBas
         return Ok(ApiResponse<object>.Ok(hotels.Select(h => new { h.HotelId, h.Name, h.Destination, h.IsActive })));
     }
 
+    [HttpDelete("hotels/{hotelId:guid}")]
+    public async Task<IActionResult> DeleteHotel(Guid hotelId)
+    {
+        if (!IsAdmin()) return Forbid();
+        await inventoryService.DeleteHotelAsync(hotelId);
+        return Ok(ApiResponse<string>.Ok("Hotel deleted successfully"));
+    }
+
     [HttpPost("hotels/{hotelId:guid}/roomtypes")]
     public async Task<IActionResult> CreateRoomType(Guid hotelId, [FromBody] CreateRoomTypeRequest request)
     {

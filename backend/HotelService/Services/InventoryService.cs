@@ -139,6 +139,18 @@ public class InventoryService(
         logger.LogInformation("Upserted inventory for RoomType {RoomTypeId}", request.RoomTypeId);
     }
 
+    /// <precondition>Hotel with hotelId exists in database</precondition>
+    /// <postcondition>Hotel IsActive set to false (soft delete); hotel:detail cache key evicted</postcondition>
+    public async Task DeleteHotelAsync(Guid hotelId)
+    {
+        var hotel = await db.Hotels.FindAsync(hotelId)
+            ?? throw new NotFoundException($"Hotel {hotelId} not found");
+        hotel.IsActive = false;
+        await SaveAsync();
+        await cache.RemoveAsync($"hotel:detail:{hotelId}");
+        logger.LogInformation("Soft-deleted hotel {HotelId}", hotelId);
+    }
+
     /// <precondition>days >= 1</precondition>
     /// <postcondition>Returns hotels where AvailableCount/TotalCount < 0.20 within next {days} days</postcondition>
     public async Task<IEnumerable<CapacityReportItem>> GetLowCapacityReportAsync(int days)

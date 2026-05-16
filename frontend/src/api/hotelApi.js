@@ -37,5 +37,8 @@ export const adminGetRoomTypes = (hotelId) =>
 export const adminCreateRoomType = (hotelId, payload) =>
   client.post(`/admin/hotels/${hotelId}/roomtypes`, payload)
 
+export const adminDeleteHotel = (hotelId) =>
+  client.delete(`/admin/hotels/${hotelId}`)
+
 export const adminUpsertInventory = (payload) =>
   client.post('/admin/inventory', payload)

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   adminListHotels,
   adminCreateHotel,
+  adminDeleteHotel,
   adminGetRoomTypes,
   adminCreateRoomType,
   adminUpsertInventory,
@@ -28,6 +30,17 @@ export default function AdminPage() {
       .then(({ data }) => setHotels(data.data ?? []))
       .catch(() => setHotels([]))
       .finally(() => setLoadingHotels(false))
+  }
+
+  const handleDeleteHotel = async (hotelId, name) => {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return
+    try {
+      await adminDeleteHotel(hotelId)
+      flash('Hotel deleted.')
+      loadHotels()
+    } catch {
+      flash('Failed to delete hotel.', false)
+    }
   }
 
   useEffect(() => { loadHotels() }, [])
@@ -106,6 +119,9 @@ export default function AdminPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <Link to="/" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-teal-600 mb-4 transition">
+        ← Back to Home
+      </Link>
       <h1 className="text-2xl font-extrabold text-slate-800 mb-1">Admin Panel</h1>
       <p className="text-slate-400 text-sm mb-6">Manage hotels, room types, and availability</p>
 
@@ -165,7 +181,15 @@ export default function AdminPage() {
                     <span className="font-semibold text-slate-800">{h.name}</span>
                     <span className="text-slate-400 text-xs ml-2">{h.destination}</span>
                   </div>
-                  <span className="text-xs text-slate-300 font-mono">{h.hotelId?.slice(0, 8)}…</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-300 font-mono">{h.hotelId?.slice(0, 8)}…</span>
+                    <button
+                      onClick={() => handleDeleteHotel(h.hotelId, h.name)}
+                      className="text-xs text-red-400 hover:text-red-600 font-medium transition"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -33,7 +33,7 @@
 
     {
       "UpstreamPathTemplate": "/gateway/v1/admin/hotels/{everything}",
-      "UpstreamHttpMethod": [ "GET", "POST", "PUT" ],
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE" ],
       "DownstreamPathTemplate": "/api/v1/admin/hotels/{everything}",
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],

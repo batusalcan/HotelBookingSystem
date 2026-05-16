@@ -11,5 +11,6 @@ public interface IInventoryService
     Task<RoomType> CreateRoomTypeAsync(Guid hotelId, CreateRoomTypeRequest request);
     Task<IEnumerable<RoomType>> GetRoomTypesAsync(Guid hotelId);
     Task UpsertInventoryAsync(UpsertInventoryRequest request);
+    Task DeleteHotelAsync(Guid hotelId);
     Task<IEnumerable<CapacityReportItem>> GetLowCapacityReportAsync(int days);
 }
