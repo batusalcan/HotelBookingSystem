@@ -136,6 +136,12 @@ public class InventoryService(
 
         await SaveAsync();
         await cache.RemoveAsync($"hotel:detail:{request.HotelId}");
+
+        // Bust all search cache entries for this hotel's destination so the new inventory is visible immediately.
+        var hotel = await db.Hotels.FindAsync(request.HotelId);
+        if (hotel is not null)
+            await cache.RemoveByPatternAsync($"v2:search:{hotel.Destination.ToLower()}:*");
+
         logger.LogInformation("Upserted inventory for RoomType {RoomTypeId}", request.RoomTypeId);
     }
 

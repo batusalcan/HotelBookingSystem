@@ -10,6 +10,7 @@ namespace HotelService.Cache;
 public class RedisCacheService(IConnectionMultiplexer multiplexer, ILogger<RedisCacheService> logger) : ICacheService
 {
     private readonly IDatabase _db = multiplexer.GetDatabase();
+    private IServer Server => multiplexer.GetServer(multiplexer.GetEndPoints().First());
 
     public async Task<string?> GetAsync(string key)
     {
@@ -46,6 +47,20 @@ public class RedisCacheService(IConnectionMultiplexer multiplexer, ILogger<Redis
         catch (Exception ex)
         {
             logger.LogWarning("Redis DEL failed for key {Key}: {Message}", key, ex.Message);
+        }
+    }
+
+    public async Task RemoveByPatternAsync(string pattern)
+    {
+        try
+        {
+            var keys = Server.KeysAsync(pattern: pattern);
+            await foreach (var key in keys)
+                await _db.KeyDeleteAsync(key);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Redis DEL pattern {Pattern} failed: {Message}", pattern, ex.Message);
         }
     }
 }

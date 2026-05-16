@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function HotelCard({ hotel, searchParams }) {
   const { session } = useAuth()
+  const [imgError, setImgError] = useState(false)
 
   const basePrice = hotel.pricePerNight ?? 0
   const price = session ? (basePrice * 0.85).toFixed(0) : basePrice.toFixed(0)
@@ -11,8 +13,8 @@ export default function HotelCard({ hotel, searchParams }) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col md:flex-row">
       <div className="md:w-56 h-44 md:h-auto bg-slate-100 flex-shrink-0 flex items-center justify-center text-slate-300 text-sm overflow-hidden">
-        {hotel.imageUrl
-          ? <img src={hotel.imageUrl} alt={hotel.name} className="w-full h-full object-cover" />
+        {hotel.imageUrl && !imgError
+          ? <img src={hotel.imageUrl} alt={hotel.name} className="w-full h-full object-cover" onError={() => setImgError(true)} />
           : <span className="text-4xl">🏨</span>}
       </div>
 

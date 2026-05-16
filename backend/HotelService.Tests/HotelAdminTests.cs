@@ -15,6 +15,7 @@ public class HotelAdminTests
         public Task<string?> GetAsync(string key) => Task.FromResult<string?>(null);
         public Task SetAsync(string key, string value, TimeSpan ttl) => Task.CompletedTask;
         public Task RemoveAsync(string key) => Task.CompletedTask;
+        public Task RemoveByPatternAsync(string pattern) => Task.CompletedTask;
     }
 
     private static DbContextOptions<CatalogDbContext> InMemoryOptions(string name)
