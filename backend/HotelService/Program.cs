@@ -82,14 +82,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             OnTokenValidated = ctx =>
             {
                 // Supabase stores roles in app_metadata.roles (nested JSON).
-                // Extract them from the raw token string — works regardless of JWT library version.
+                // Read the raw Authorization header directly — avoids any library abstraction issues.
                 try
                 {
-                    // ctx.SecurityToken is JsonWebToken in .NET 8, JwtSecurityToken in older versions.
-                    // Both expose the token as a dot-separated string via ToString().
-                    var raw = ctx.SecurityToken.ToString()!;
-                    var segment = raw.Split('.')[1];
-                    // Re-pad base64url → base64
+                    var authHeader = ctx.HttpContext.Request.Headers.Authorization.ToString();
+                    if (!authHeader.StartsWith("Bearer ")) return Task.CompletedTask;
+
+                    var segment = authHeader["Bearer ".Length..].Trim().Split('.')[1];
                     segment = segment.Replace('-', '+').Replace('_', '/');
                     segment += new string('=', (4 - segment.Length % 4) % 4);
                     var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(segment));
