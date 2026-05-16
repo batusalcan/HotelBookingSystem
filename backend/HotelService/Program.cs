@@ -81,18 +81,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnTokenValidated = ctx =>
             {
-                // Supabase stores roles in app_metadata.roles as a nested JSON object.
-                // The JWT middleware may not expose nested objects as flat claims,
-                // so decode the raw JWT payload directly and inject role claims.
+                // Supabase stores roles in app_metadata.roles (nested JSON).
+                // Extract them from the raw token string — works regardless of JWT library version.
                 try
                 {
-                    var jwt = ctx.SecurityToken as System.IdentityModel.Tokens.Jwt.JwtSecurityToken;
-                    if (jwt is null) return Task.CompletedTask;
-
-                    // RawPayload is the base64url-encoded middle segment of the JWT
-                    var padded = jwt.RawPayload.Replace('-', '+').Replace('_', '/');
-                    padded += (4 - padded.Length % 4) % 4 == 0 ? "" : new string('=', (4 - padded.Length % 4) % 4);
-                    var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(padded));
+                    // ctx.SecurityToken is JsonWebToken in .NET 8, JwtSecurityToken in older versions.
+                    // Both expose the token as a dot-separated string via ToString().
+                    var raw = ctx.SecurityToken.ToString()!;
+                    var segment = raw.Split('.')[1];
+                    // Re-pad base64url → base64
+                    segment = segment.Replace('-', '+').Replace('_', '/');
+                    segment += new string('=', (4 - segment.Length % 4) % 4);
+                    var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(segment));
 
                     var doc = JsonDocument.Parse(json);
                     if (doc.RootElement.TryGetProperty("app_metadata", out var appMeta)
@@ -106,7 +106,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                             identity.AddClaim(new Claim(ClaimTypes.Role, rolesEl.GetString()!));
                     }
                 }
-                catch { /* malformed JWT payload — skip */ }
+                catch { /* malformed token — skip */ }
                 return Task.CompletedTask;
             }
         };
