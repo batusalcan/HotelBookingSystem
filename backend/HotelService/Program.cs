@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Text.Json;
 using HotelService.Cache;
 using HotelService.Data;
 using HotelService.Health;
@@ -74,6 +76,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             NameClaimType = "sub"
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = ctx =>
+            {
+                // Supabase stores roles in app_metadata.roles — map them to standard role claims
+                var appMeta = ctx.Principal?.FindFirstValue("app_metadata");
+                if (appMeta is not null)
+                {
+                    try
+                    {
+                        var doc = JsonDocument.Parse(appMeta);
+                        if (doc.RootElement.TryGetProperty("roles", out var rolesEl))
+                        {
+                            var identity = (ClaimsIdentity)ctx.Principal!.Identity!;
+                            if (rolesEl.ValueKind == JsonValueKind.Array)
+                                foreach (var r in rolesEl.EnumerateArray())
+                                    identity.AddClaim(new Claim(ClaimTypes.Role, r.GetString()!));
+                            else if (rolesEl.ValueKind == JsonValueKind.String)
+                                identity.AddClaim(new Claim(ClaimTypes.Role, rolesEl.GetString()!));
+                        }
+                    }
+                    catch { /* malformed claim — skip */ }
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
