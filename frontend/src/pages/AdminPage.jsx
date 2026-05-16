@@ -55,8 +55,8 @@ export default function AdminPage() {
       flash('Hotel created successfully.')
       setHotelForm({ name: '', destination: '', latitude: '', longitude: '', baseRating: '8.0', imageUrl: '' })
       loadHotels()
-    } catch {
-      flash('Failed to create hotel.', false)
+    } catch (err) {
+      flash(`Failed to create hotel. ${err.response?.status} — ${JSON.stringify(err.response?.data)}`, false)
     }
   }
 
