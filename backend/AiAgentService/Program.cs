@@ -13,8 +13,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseSerilog((ctx, cfg) => cfg.ReadFrom.Configuration(ctx.Configuration));
 
 // ── AI Provider (swap here to change LLM — zero business logic change required) ──
-builder.Services.AddHttpClient<IAiProvider, GeminiAiProvider>()
-    .AddStandardResilienceHandler();
+// No resilience handler: its 10s attempt timeout + circuit breaker causes Gemini to fail
+// on cold-start and then reject all calls for 30s. AiChatService handles errors itself.
+builder.Services.AddHttpClient<IAiProvider, GeminiAiProvider>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 // ── Hotel System Facade (typed HttpClient → HotelService) ────────────────────
 builder.Services.AddHttpClient<IHotelSystemFacade, HotelSystemFacade>(client =>
