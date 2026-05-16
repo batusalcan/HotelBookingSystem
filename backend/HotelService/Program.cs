@@ -81,25 +81,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnTokenValidated = ctx =>
             {
-                // Supabase stores roles in app_metadata.roles — map them to standard role claims
-                var appMeta = ctx.Principal?.FindFirstValue("app_metadata");
-                if (appMeta is not null)
+                // Supabase stores roles in app_metadata.roles as a nested JSON object.
+                // The JWT middleware may not expose nested objects as flat claims,
+                // so decode the raw JWT payload directly and inject role claims.
+                try
                 {
-                    try
+                    var jwt = ctx.SecurityToken as System.IdentityModel.Tokens.Jwt.JwtSecurityToken;
+                    if (jwt is null) return Task.CompletedTask;
+
+                    // RawPayload is the base64url-encoded middle segment of the JWT
+                    var padded = jwt.RawPayload.Replace('-', '+').Replace('_', '/');
+                    padded += (4 - padded.Length % 4) % 4 == 0 ? "" : new string('=', (4 - padded.Length % 4) % 4);
+                    var json = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(padded));
+
+                    var doc = JsonDocument.Parse(json);
+                    if (doc.RootElement.TryGetProperty("app_metadata", out var appMeta)
+                        && appMeta.TryGetProperty("roles", out var rolesEl))
                     {
-                        var doc = JsonDocument.Parse(appMeta);
-                        if (doc.RootElement.TryGetProperty("roles", out var rolesEl))
-                        {
-                            var identity = (ClaimsIdentity)ctx.Principal!.Identity!;
-                            if (rolesEl.ValueKind == JsonValueKind.Array)
-                                foreach (var r in rolesEl.EnumerateArray())
-                                    identity.AddClaim(new Claim(ClaimTypes.Role, r.GetString()!));
-                            else if (rolesEl.ValueKind == JsonValueKind.String)
-                                identity.AddClaim(new Claim(ClaimTypes.Role, rolesEl.GetString()!));
-                        }
+                        var identity = (ClaimsIdentity)ctx.Principal!.Identity!;
+                        if (rolesEl.ValueKind == JsonValueKind.Array)
+                            foreach (var r in rolesEl.EnumerateArray())
+                                identity.AddClaim(new Claim(ClaimTypes.Role, r.GetString()!));
+                        else if (rolesEl.ValueKind == JsonValueKind.String)
+                            identity.AddClaim(new Claim(ClaimTypes.Role, rolesEl.GetString()!));
                     }
-                    catch { /* malformed claim — skip */ }
                 }
+                catch { /* malformed JWT payload — skip */ }
                 return Task.CompletedTask;
             }
         };
