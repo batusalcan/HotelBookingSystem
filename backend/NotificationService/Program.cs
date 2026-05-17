@@ -55,24 +55,32 @@ var app = builder.Build();
 // Create NotificationAlerts table if it doesn't exist (shared Supabase DB — EnsureCreated won't work)
 using (var scope = app.Services.CreateScope())
 {
-    var notifDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
-    await notifDb.Database.ExecuteSqlRawAsync(@"
-        CREATE TABLE IF NOT EXISTS ""NotificationAlerts"" (
-            ""NotificationId"" uuid NOT NULL DEFAULT gen_random_uuid(),
-            ""HotelId"" uuid NOT NULL,
-            ""HotelName"" character varying(200) NOT NULL,
-            ""RoomTypeName"" character varying(100) NOT NULL,
-            ""AvailableCount"" integer NOT NULL,
-            ""TotalCount"" integer NOT NULL,
-            ""CapacityRatio"" double precision NOT NULL,
-            ""StartDate"" date NOT NULL,
-            ""EndDate"" date NOT NULL,
-            ""CreatedAt"" timestamptz NOT NULL DEFAULT now(),
-            ""IsRead"" boolean NOT NULL DEFAULT false,
-            CONSTRAINT ""PK_NotificationAlerts"" PRIMARY KEY (""NotificationId"")
-        );
-        CREATE INDEX IF NOT EXISTS ""IX_NotificationAlerts_CreatedAt"" ON ""NotificationAlerts"" (""CreatedAt"");
-    ");
+    try
+    {
+        var notifDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        await notifDb.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""NotificationAlerts"" (
+                ""NotificationId"" uuid NOT NULL DEFAULT gen_random_uuid(),
+                ""HotelId"" uuid NOT NULL,
+                ""HotelName"" character varying(200) NOT NULL,
+                ""RoomTypeName"" character varying(100) NOT NULL,
+                ""AvailableCount"" integer NOT NULL,
+                ""TotalCount"" integer NOT NULL,
+                ""CapacityRatio"" double precision NOT NULL,
+                ""StartDate"" date NOT NULL,
+                ""EndDate"" date NOT NULL,
+                ""CreatedAt"" timestamptz NOT NULL DEFAULT now(),
+                ""IsRead"" boolean NOT NULL DEFAULT false,
+                CONSTRAINT ""PK_NotificationAlerts"" PRIMARY KEY (""NotificationId"")
+            );
+            CREATE INDEX IF NOT EXISTS ""IX_NotificationAlerts_CreatedAt"" ON ""NotificationAlerts"" (""CreatedAt"");
+        ");
+    }
+    catch (Exception ex)
+    {
+        var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+        startupLogger.LogWarning(ex, "Could not ensure NotificationAlerts table on startup — DB may not be available yet");
+    }
 }
 
 // ── Correlation ID middleware — must come BEFORE UseSerilogRequestLogging ────────
