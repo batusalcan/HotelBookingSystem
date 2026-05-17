@@ -91,6 +91,7 @@ These define the high-level structure of the system and are practically required
 - **Concurrency Handling:** To prevent overbooking (race conditions), the booking transaction must utilize Optimistic Concurrency Control (e.g., using a `RowVersion` concurrency token in EF Core) to ensure the room's capacity is validated immediately before committing the decrement.
 - **Outputs:** JSON confirmation object. Updates SQL database (decrements capacity). Publishes `ReservationCreatedEvent` (JSON) to RabbitMQ.
 - **Payment:** NO transaction data input is required.
+- **My Bookings:** Authenticated users can retrieve all their past and current bookings (`GET /api/v1/bookings`) and cancel a confirmed booking (`DELETE /api/v1/bookings/{bookingId}`). The My Bookings page shows check-in/out dates, nights count, total amount, status (Confirmed/Cancelled), and creation date.
 
 ### 6.4 Comments Service
 
@@ -106,10 +107,12 @@ These define the high-level structure of the system and are practically required
 
 This service contains two distinct architectural tasks:
 
-- **Task 1 (Event-Driven Queue Consumer):** Subscribes to RabbitMQ as an always-on `IHostedService`. Inputs: AMQP Message for new reservations. Outputs: Pulls new hotel reservations from the queue and sends them a message about reservation details.
-- **Task 2 (Scheduled Cron Job):** A nightly scheduled task. Inputs: Nightly timer trigger. Outputs: Goes over all hotel capacities and notifies hotel administrators when it is below 20% for the next month.
+- **Task 1 (Event-Driven Queue Consumer):** Subscribes to RabbitMQ as an always-on `IHostedService`. Inputs: AMQP Message for new reservations. Outputs: Deserializes `ReservationCreatedEvent` and logs booking confirmation to console (simulated notification). ACK on success; NACK + requeue on failure.
+- **Task 2 (Scheduled Cron Job):** A nightly scheduled task. Inputs: Nightly timer trigger (cloud scheduler hits `POST /api/v1/notifications/capacity-check`). Outputs: Queries HotelService for all InventoryBlocks in the next 30 days where `AvailableCount / TotalCount < 0.20`. Clears the previous run's snapshot from the `NotificationAlerts` PostgreSQL table, then persists a fresh `NotificationAlert` row for every low-capacity block found. Admins view these alerts in the Admin Panel Notifications tab via `GET /api/v1/notifications`; individual alerts can be marked as read via `PATCH /api/v1/notifications/{id}/read`. The unread alert count is displayed as a badge in the admin UI and refreshes every 60 seconds via background polling.
 
 > **Assumption — Queue Consumer Design:** The project PDF groups both tasks under "write a nightly scheduled task", which could imply a batch-pull pattern for the queue. We have implemented Task 1 as an **always-on AMQP consumer** (ACK/NACK per message) rather than a nightly batch job. This is the correct pattern for RabbitMQ — a batch-pull nightly job would leave booking confirmation messages undelivered for up to 24 hours, which contradicts the system's real-time notification intent. **This assumption will be documented in the project README.**
+
+> **Design Decision — In-Website Notifications:** Low-capacity alerts are delivered as in-website notifications stored in a dedicated `NotificationAlerts` PostgreSQL table (owned by NotificationService with its own `NotificationsDbContext`). This replaces a purely log-based approach and provides a persistent, queryable audit trail that the admin panel can display without requiring email integration.
 
 ### 6.6 AI Agent Service
 
@@ -137,7 +140,8 @@ This service contains two distinct architectural tasks:
   - **Search results page:** paginated hotel cards with rating, review count, price (discounted if logged in); sort dropdown; "Show on Map" Leaflet toggle
   - **Hotel detail page:** hotel info + "Rezervasyon yap" booking button + 15% discount banner if logged in + comments/ratings section
   - **Booking confirmation page:** booking ID, room type, stay dates, confirmed status badge
-  - **Admin panel:** hotel creation form + room type management + inventory management form (Başlangıç/Bitiş, Oda Tipi dropdown, Oda Adedi, Dolu/Boş)
+  - **My Bookings page:** lists all user reservations (check-in/out, nights, total amount, status badge, booking ID); cancel button with confirmation dialog; calls `GET /api/v1/bookings` and `DELETE /api/v1/bookings/{bookingId}`
+  - **Admin panel:** 4 tabs — Hotels (create/list/delete), Room Types (create/list per hotel), Inventory (upsert with start/end date + room count + occupied/vacant), Notifications (low-capacity alerts with capacity bar, urgency color coding, unread badge, 60-second background polling via `GET /api/v1/notifications`)
   - **AI chat window:** floating widget on all pages (visible only when signed in); calls `POST /gateway/v1/ai/chat`
   - **Sign-In page:** email + password login via IAM provider (Supabase Auth); links to Sign-Up page
   - **Sign-Up / Registration page:** email, password, and confirm password inputs; client-side validation (passwords match, min 6 chars); creates account via IAM provider SDK; handles auto-confirm (redirect to home) and email-verification (show "Check your email" screen) flows _(see Assumption below)_

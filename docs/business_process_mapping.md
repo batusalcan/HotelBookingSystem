@@ -60,7 +60,7 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 | 3.5  | Create and publish `ReservationCreatedEvent` to RabbitMQ.                             | Hotel Service -> RabbitMQ         | `ReservationCreatedEvent (JSON)`                                                          |
 | 3.6  | Return immediate booking confirmation to user.                                        | Hotel Service -> UI               | `HTTP 200 OK`, `{ bookingId, status: "Confirmed" }`                                       |
 | 3.7  | Notification Service consumes event from queue.                                       | RabbitMQ -> Notification Service  | `ReservationCreatedEvent (JSON)`                                                          |
-| 3.8  | Dispatch simulated Email/SMS confirmation to user.                                    | Notification Service              | `User Contact Info`, `Booking Details`                                                    |
+| 3.8  | Log booking confirmation to console (simulated notification — no actual email/SMS).   | Notification Service              | `UserId`, `BookingId`, `HotelName`, `Dates`                                               |
 
 ---
 
@@ -105,11 +105,13 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 | Step | Action                                                             | System Component                        | Required Data (Data Flow)                        |
 | :--- | :----------------------------------------------------------------- | :-------------------------------------- | :----------------------------------------------- |
-| 6.1  | Trigger nightly scheduled job.                                                    | Cloud Scheduler -> Notification Service           | `Cron Trigger Signal`                                                             |
+| 6.1  | Trigger nightly scheduled job.                                                    | Cloud Scheduler -> Notification Service           | `Cron Trigger Signal (POST /api/v1/notifications/capacity-check)`                 |
 | 6.2  | Call Hotel Service internal capacity report endpoint.                             | Notification Service -> Hotel Service             | `GET /api/v1/admin/hotels/capacity-report?days=30`                                |
 | 6.3  | Hotel Service executes SQL aggregate query and returns low-capacity hotel list.   | Hotel Service -> SQL DB -> Notification Service   | `SQL Aggregate Query (next 30 days, AvailableCount/TotalCount < 0.20)`            |
-| 6.4  | Identify hotels where available capacity < 20% of total.                          | Notification Service                              | `Inventory ResultSet (HotelId, HotelName, CapacityRatio, DateRange)`              |
-| 6.5  | Dispatch low-capacity warning alert to Admin channels (simulated).                | Notification Service                              | `Admin Contact Info`, `HotelId`, `Alert Message`                                  |
+| 6.4  | Clear previous run's alert snapshot from NotificationAlerts table.                | Notification Service -> NotificationsDb           | `DELETE FROM "NotificationAlerts"` (bulk — replaces stale snapshot with fresh data) |
+| 6.5  | Persist new NotificationAlert row for each low-capacity InventoryBlock found.     | Notification Service -> NotificationsDb           | `INSERT NotificationAlert (HotelId, HotelName, RoomTypeName, AvailableCount, TotalCount, CapacityRatio, StartDate, EndDate)` |
+| 6.6  | Admin UI polls GET /api/v1/notifications to retrieve current alert list.          | Admin Browser -> API Gateway -> Notification Service | `GET /gateway/v1/notifications` (paginated, ordered by CreatedAt desc)          |
+| 6.7  | Admin views alert cards; marks individual alerts as read.                         | Admin Browser -> API Gateway -> Notification Service | `PATCH /gateway/v1/notifications/{id}/read`; unread badge count updated in UI  |
 
 ---
 
@@ -519,4 +521,133 @@ This document serves as the foundational blueprint for the Hotel Booking System.
 
 - On successful processing → send `ACK` to remove message from queue.
 - On processing failure → send `NACK` to requeue message for retry.
-- Simulated output: Log confirmation message to console (Email/SMS simulation).
+- Simulated output: Log confirmation message to console (no actual email/SMS integration).
+
+---
+
+### 7. Hotel Service — User Bookings
+
+#### `GET /api/v1/bookings`
+
+- **Description:** Returns all bookings for the currently authenticated user, ordered by creation date descending.
+- **Security:** Authenticated (User JWT). UserId extracted from JWT `sub` claim.
+
+**Response (200 OK):**
+
+```json
+[
+  {
+    "bookingId": "booking-guid-456",
+    "hotelId": "11111111-0000-0000-0000-000000000001",
+    "roomTypeId": "22222222-0000-0000-0000-000000000001",
+    "checkInDate": "2026-05-15",
+    "checkOutDate": "2026-05-20",
+    "guestCount": 2,
+    "totalAmount": 1750.00,
+    "status": "Confirmed",
+    "createdAt": "2026-05-10T14:30:00Z"
+  }
+]
+```
+
+---
+
+#### `DELETE /api/v1/bookings/{bookingId}`
+
+- **Description:** Cancels a booking. Only the owner of the booking (matched via JWT `sub`) can cancel it.
+- **Security:** Authenticated (User JWT).
+- **Postcondition:** Booking `Status` updated to `"Cancelled"` in SQL. Inventory is NOT automatically restored (manual admin operation if needed).
+
+**Responses:**
+- `200 OK` — Booking cancelled.
+- `401 Unauthorized` — Missing or invalid JWT.
+- `403 Forbidden` — JWT user does not own this booking.
+- `404 Not Found` — Booking not found.
+
+---
+
+### 8. Hotel Service — Admin Extras
+
+#### `DELETE /api/v1/admin/hotels/{hotelId}`
+
+- **Description:** Deletes a hotel (and its room types and inventory blocks) from the catalog.
+- **Security:** Authenticated (Admin Role).
+
+**Responses:** `200 OK` — Hotel deleted. `401 Unauthorized`. `404 Not Found`.
+
+---
+
+#### `POST /api/v1/admin/cache/clear`
+
+- **Description:** Clears Redis cache entries matching a pattern. Used after admin inventory or hotel updates to prevent stale search results from being served.
+- **Security:** Authenticated (Admin Role).
+
+**Request Body:**
+```json
+{ "pattern": "v2:search:*" }
+```
+
+**Responses:** `200 OK` — Cache entries cleared.
+
+---
+
+### 9. Notification Service
+
+#### `GET /api/v1/notifications`
+
+- **Description:** Returns the current snapshot of low-capacity hotel alerts stored in the `NotificationAlerts` table. Ordered by `CreatedAt` descending (most recent first). Each run of the nightly cron job replaces the previous snapshot — only the latest run's results are stored at any time. The admin panel polls this endpoint every 60 seconds.
+- **Security:** Authenticated (Bearer JWT — gateway validates).
+
+**Query Parameters:**
+
+| Parameter | Type | Required | Description |
+|:---|:---|:---|:---|
+| `page` | int | No | Page number (default: 1) |
+| `pageSize` | int | No | Results per page (default: 50) |
+
+**Response (200 OK):**
+
+```json
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalRecords": 4,
+  "data": [
+    {
+      "notificationId": "uuid-...",
+      "hotelId": "11111111-0000-0000-0000-000000000001",
+      "hotelName": "Hyde Bodrum",
+      "roomTypeName": "Standard",
+      "availableCount": 1,
+      "totalCount": 10,
+      "capacityRatio": 0.10,
+      "startDate": "2026-06-01",
+      "endDate": "2026-06-15",
+      "createdAt": "2026-05-17T02:00:00Z",
+      "isRead": false
+    }
+  ]
+}
+```
+
+---
+
+#### `PATCH /api/v1/notifications/{notificationId}/read`
+
+- **Description:** Marks a single notification alert as read. The admin panel calls this when the admin clicks on an alert. The unread badge count in the UI decrements accordingly.
+- **Security:** Authenticated (Bearer JWT).
+
+**Responses:**
+- `200 OK` — Alert marked as read.
+- `404 Not Found` — Alert not found.
+
+---
+
+#### `POST /api/v1/notifications/capacity-check`
+
+- **Description:** Triggers the nightly capacity alert job manually. Intended to be called by the cloud scheduler (Azure App Logic / Google Cloud Scheduler) on a nightly cron schedule. Can also be triggered manually from the Azure portal for testing.
+- **Security:** No authentication required (called by internal scheduler).
+- **Query Parameters:** `days` (int, optional, default: 30) — number of days ahead to check.
+
+**Responses:**
+- `200 OK` — Job ran successfully. Response includes count of alerts saved.
