@@ -369,7 +369,7 @@ export default function AdminPage() {
                     <p className="text-xs opacity-80 mt-0.5">{a.roomTypeName} · {a.startDate?.slice(0,10)} – {a.endDate?.slice(0,10)}</p>
                   </div>
                   <span className="text-xs font-bold bg-white bg-opacity-60 rounded-lg px-2 py-1 shrink-0">
-                    {a.availableCount} / {a.totalCount} rooms
+                    {a.availableCount} of {a.totalCount} available
                   </span>
                 </div>
                 <div className="mt-3">
