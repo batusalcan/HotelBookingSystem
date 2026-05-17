@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using NotificationService.Data;
 using NotificationService.Health;
 using NotificationService.HttpClients;
 using NotificationService.Jobs;
@@ -18,6 +20,10 @@ builder.Services.AddHttpClient<IHotelServiceClient, HotelServiceClient>(client =
     client.BaseAddress = new Uri(builder.Configuration["HotelService:BaseUrl"] ?? "http://localhost:5001");
 })
 .AddStandardResilienceHandler();
+
+// Notifications DB
+builder.Services.AddDbContext<NotificationsDbContext>(opt =>
+    opt.UseNpgsql(builder.Configuration.GetConnectionString("NotificationsDb")));
 
 // Factory Method Pattern — concrete notification types registered as transient
 builder.Services.AddTransient<BookingConfirmationNotification>();
@@ -45,6 +51,29 @@ builder.Services.AddHealthChecks()
         tags: ["messaging"]);
 
 var app = builder.Build();
+
+// Create NotificationAlerts table if it doesn't exist (shared Supabase DB — EnsureCreated won't work)
+using (var scope = app.Services.CreateScope())
+{
+    var notifDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+    await notifDb.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS ""NotificationAlerts"" (
+            ""NotificationId"" uuid NOT NULL DEFAULT gen_random_uuid(),
+            ""HotelId"" uuid NOT NULL,
+            ""HotelName"" character varying(200) NOT NULL,
+            ""RoomTypeName"" character varying(100) NOT NULL,
+            ""AvailableCount"" integer NOT NULL,
+            ""TotalCount"" integer NOT NULL,
+            ""CapacityRatio"" double precision NOT NULL,
+            ""StartDate"" date NOT NULL,
+            ""EndDate"" date NOT NULL,
+            ""CreatedAt"" timestamptz NOT NULL DEFAULT now(),
+            ""IsRead"" boolean NOT NULL DEFAULT false,
+            CONSTRAINT ""PK_NotificationAlerts"" PRIMARY KEY (""NotificationId"")
+        );
+        CREATE INDEX IF NOT EXISTS ""IX_NotificationAlerts_CreatedAt"" ON ""NotificationAlerts"" (""CreatedAt"");
+    ");
+}
 
 // ── Correlation ID middleware — must come BEFORE UseSerilogRequestLogging ────────
 app.Use(async (ctx, next) =>

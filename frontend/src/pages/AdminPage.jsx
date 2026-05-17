@@ -7,7 +7,7 @@ import {
   adminGetRoomTypes,
   adminCreateRoomType,
   adminUpsertInventory,
-  adminGetCapacityReport,
+  adminGetNotifications,
 } from '../api/hotelApi'
 
 const today = new Date().toISOString().split('T')[0]
@@ -38,7 +38,7 @@ export default function AdminPage() {
 
   const loadAlerts = () => {
     setLoadingAlerts(true)
-    adminGetCapacityReport(30)
+    adminGetNotifications()
       .then(({ data }) => setAlerts(data.data ?? []))
       .catch(() => setAlerts([]))
       .finally(() => setLoadingAlerts(false))
@@ -60,6 +60,16 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === 'notifications') loadAlerts()
   }, [tab])
+
+  // Background poll every 60s to keep the unread badge up to date
+  useEffect(() => {
+    const id = setInterval(() => {
+      adminGetNotifications()
+        .then(({ data }) => setAlerts(data.data ?? []))
+        .catch(() => {})
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     if (!selectedHotelId) { setRoomTypes([]); return }
@@ -163,9 +173,9 @@ export default function AdminPage() {
             }`}
           >
             {t.label}
-            {t.key === 'notifications' && alerts.length > 0 && (
+            {t.key === 'notifications' && alerts.filter(a => !a.isRead).length > 0 && (
               <span className="ml-1.5 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5">
-                {alerts.length}
+                {alerts.filter(a => !a.isRead).length}
               </span>
             )}
           </button>
@@ -327,8 +337,7 @@ export default function AdminPage() {
             <div>
               <h2 className="font-bold text-slate-700">Low Capacity Alerts</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Room types with less than 20% availability in the next 30 days.
-                The nightly scheduler checks this and sends alerts automatically.
+                Sent by the nightly scheduler — room types below 20% availability in the next 30 days.
               </p>
             </div>
             <button
@@ -367,6 +376,7 @@ export default function AdminPage() {
                   <div>
                     <p className="font-bold text-sm">{a.hotelName}</p>
                     <p className="text-xs opacity-80 mt-0.5">{a.roomTypeName} · {a.startDate?.slice(0,10)} – {a.endDate?.slice(0,10)}</p>
+                    <p className="text-xs opacity-60 mt-0.5">Alerted at {new Date(a.createdAt).toLocaleString()}</p>
                   </div>
                   <span className="text-xs font-bold bg-white bg-opacity-60 rounded-lg px-2 py-1 shrink-0">
                     {a.availableCount} of {a.totalCount} available

@@ -45,3 +45,6 @@ export const adminUpsertInventory = (payload) =>
 
 export const adminGetCapacityReport = (days = 30) =>
   client.get('/admin/hotels/capacity-report', { params: { days } })
+
+export const adminGetNotifications = (page = 1, pageSize = 50) =>
+  client.get('/notifications', { params: { page, pageSize } })

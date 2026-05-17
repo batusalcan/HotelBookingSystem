@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HotelService.Cache;
 using HotelService.DTOs;
 using HotelService.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,7 +11,7 @@ namespace HotelService.Controllers.v1;
 [ApiController]
 [Route("api/v1/admin")]
 [Authorize]
-public class AdminController(IInventoryService inventoryService) : ControllerBase
+public class AdminController(IInventoryService inventoryService, ICacheService cache) : ControllerBase
 {
     // Supabase puts roles in app_metadata.roles — decode the raw JWT to verify admin.
     private bool IsAdmin()
@@ -88,6 +89,14 @@ public class AdminController(IInventoryService inventoryService) : ControllerBas
         if (!IsAdmin()) return Forbid();
         await inventoryService.UpsertInventoryAsync(request);
         return Ok(ApiResponse<string>.Ok("Inventory updated successfully"));
+    }
+
+    [HttpPost("cache/clear")]
+    public async Task<IActionResult> ClearCache([FromQuery] string pattern = "v2:search:*")
+    {
+        if (!IsAdmin()) return Forbid();
+        await cache.RemoveByPatternAsync(pattern);
+        return Ok(ApiResponse<string>.Ok($"Cache cleared for pattern: {pattern}"));
     }
 
     [HttpGet("debug-auth")]

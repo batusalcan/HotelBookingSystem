@@ -154,6 +154,7 @@ public class InventoryService(
         hotel.IsActive = false;
         await SaveAsync();
         await cache.RemoveAsync($"hotel:detail:{hotelId}");
+        await cache.RemoveByPatternAsync($"v2:search:{hotel.Destination.ToLower()}:*");
         logger.LogInformation("Soft-deleted hotel {HotelId}", hotelId);
     }
 

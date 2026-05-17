@@ -96,6 +96,16 @@
     },
 
     {
+      "UpstreamPathTemplate": "/gateway/v1/notifications",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/api/v1/notifications",
+      "DownstreamScheme": "https",
+      "DownstreamHostAndPorts": [ { "Host": "hotel-notification-eccyh5cpdxhpg9b2.italynorth-01.azurewebsites.net", "Port": 443 } ],
+      "SwaggerKey": "notificationservice",
+      "RateLimitOptions": { "EnableRateLimiting": false }
+    },
+
+    {
       "UpstreamPathTemplate": "/gateway/v1/comments/{hotelId}",
       "UpstreamHttpMethod": [ "GET" ],
       "DownstreamPathTemplate": "/api/v1/comments/{hotelId}",
@@ -169,6 +179,16 @@
           "Name": "AI Agent Service",
           "Version": "v1",
           "Url": "https://hotel-aiagent-g2avhjfcfyhqcsfd.italynorth-01.azurewebsites.net/swagger/v1/swagger.json"
+        }
+      ]
+    },
+    {
+      "Key": "notificationservice",
+      "Config": [
+        {
+          "Name": "Notification Service",
+          "Version": "v1",
+          "Url": "https://hotel-notification-eccyh5cpdxhpg9b2.italynorth-01.azurewebsites.net/swagger/v1/swagger.json"
         }
       ]
     }
