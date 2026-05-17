@@ -22,7 +22,6 @@ A production-grade, Hotels.com-like hotel booking platform built as a cloud-nati
 11. [Issues Encountered & Engineering Solutions](#11-issues-encountered--engineering-solutions)
 12. [Running Locally](#12-running-locally)
 13. [Repository Structure](#13-repository-structure)
-14. [Team](#14-team)
 
 ---
 
@@ -857,14 +856,6 @@ HotelBookingSystem/
 │   └── workflows/ci.yml              # GitHub Actions: build → test → docker build verify
 └── README.md
 ```
-
----
-
-## 14. Team
-
-**Group 1 — SE 4458 — Yaşar University — May 2026**
-
-Batuhan Salcan · Mustafa Berkay Düzenli · Batıkan Akdeniz · Cenk Serbest · Toprak Orman · İlayda Gün · Demir Demirdoğen · Aycan Kurt · Ayfernaz Baygın · Sümeyye Şencan · Begüm Bal · Eren Karcı · Barış Hansu · İdil Balandı · Berk Ateş
 
 ---
 
