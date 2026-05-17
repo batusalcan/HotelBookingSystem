@@ -336,10 +336,10 @@ Each document in the collection represents the full review state for one hotel, 
 
 ### Key Structure
 
-| Cache Key Pattern                                         | Value Type  | TTL        | Description                                                                                                                                |
-| :-------------------------------------------------------- | :---------- | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
-| `search:{destination}:{startDate}:{endDate}:{guestCount}` | JSON String | 15 minutes | Serialized search result set. Key is a composite of all search parameters. Invalidated on TTL expiry.                                      |
-| `hotel:detail:{hotelId}`                                  | JSON String | 60 minutes | Serialized hotel detail object including `RoomTypes` and current `InventoryBlocks`. Used by the AI Agent Facade and the hotel detail page. |
+| Cache Key Pattern                                            | Value Type  | TTL        | Description                                                                                                                                |
+| :----------------------------------------------------------- | :---------- | :--------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| `v2:search:{destination}:{startDate}:{endDate}:{guestCount}` | JSON String | 15 minutes | Serialized search result set. Key is a composite of all search parameters. Invalidated on TTL expiry or explicit eviction on admin inventory update. The `v2:` prefix was introduced to instantly bust all pre-deduplication cache entries when a data structure fix was deployed (cache versioning pattern — bump prefix instead of flushing Redis manually). |
+| `hotel:detail:{hotelId}`                                     | JSON String | 60 minutes | Serialized hotel detail object. Explicitly evicted when admin updates inventory for that hotel. |
 
 ### Cached Search Result Value Structure
 
