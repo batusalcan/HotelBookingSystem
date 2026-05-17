@@ -8,6 +8,7 @@ import {
   adminCreateRoomType,
   adminUpsertInventory,
   adminGetNotifications,
+  markNotificationRead,
 } from '../api/hotelApi'
 
 const today = new Date().toISOString().split('T')[0]
@@ -371,16 +372,28 @@ export default function AdminPage() {
               medium:   'bg-amber-400',
             }
             return (
-              <div key={i} className={`rounded-2xl border p-4 ${colors[urgency]}`}>
+              <div key={i} className={`rounded-2xl border p-4 ${colors[urgency]} ${a.isRead ? 'opacity-60' : ''}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-bold text-sm">{a.hotelName}</p>
                     <p className="text-xs opacity-80 mt-0.5">{a.roomTypeName} · {a.startDate?.slice(0,10)} – {a.endDate?.slice(0,10)}</p>
                     <p className="text-xs opacity-60 mt-0.5">Alerted at {new Date(a.createdAt).toLocaleString()}</p>
                   </div>
-                  <span className="text-xs font-bold bg-white bg-opacity-60 rounded-lg px-2 py-1 shrink-0">
-                    {a.availableCount} of {a.totalCount} available
-                  </span>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <span className="text-xs font-bold bg-white bg-opacity-60 rounded-lg px-2 py-1">
+                      {a.availableCount} of {a.totalCount} available
+                    </span>
+                    {!a.isRead && (
+                      <button
+                        onClick={() => markNotificationRead(a.notificationId).then(() =>
+                          setAlerts(prev => prev.map(n => n.notificationId === a.notificationId ? { ...n, isRead: true } : n))
+                        ).catch(() => {})}
+                        className="text-xs font-semibold bg-white bg-opacity-70 hover:bg-opacity-100 rounded-lg px-2 py-1 transition"
+                      >
+                        Mark as read
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="mt-3">
                   <div className="flex justify-between text-xs font-semibold mb-1">

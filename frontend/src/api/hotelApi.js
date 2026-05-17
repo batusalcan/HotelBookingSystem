@@ -48,3 +48,6 @@ export const adminGetCapacityReport = (days = 30) =>
 
 export const adminGetNotifications = (page = 1, pageSize = 50) =>
   client.get('/notifications', { params: { page, pageSize } })
+
+export const markNotificationRead = (id) =>
+  client.patch(`/notifications/${id}/read`)
