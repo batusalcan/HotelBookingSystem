@@ -42,3 +42,6 @@ export const adminDeleteHotel = (hotelId) =>
 
 export const adminUpsertInventory = (payload) =>
   client.post('/admin/inventory', payload)
+
+export const adminGetCapacityReport = (days = 30) =>
+  client.get('/admin/hotels/capacity-report', { params: { days } })

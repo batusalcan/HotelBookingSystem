@@ -7,6 +7,7 @@ import {
   adminGetRoomTypes,
   adminCreateRoomType,
   adminUpsertInventory,
+  adminGetCapacityReport,
 } from '../api/hotelApi'
 
 const today = new Date().toISOString().split('T')[0]
@@ -24,12 +25,23 @@ export default function AdminPage() {
   const [selectedRtId, setSelectedRtId] = useState('')
   const [invForm, setInvForm] = useState({ startDate: today, endDate: '', availableCount: '', isAvailable: true })
 
+  const [alerts, setAlerts] = useState([])
+  const [loadingAlerts, setLoadingAlerts] = useState(false)
+
   const loadHotels = () => {
     setLoadingHotels(true)
     adminListHotels({ page: 1, pageSize: 100 })
       .then(({ data }) => setHotels(data.data ?? []))
       .catch(() => setHotels([]))
       .finally(() => setLoadingHotels(false))
+  }
+
+  const loadAlerts = () => {
+    setLoadingAlerts(true)
+    adminGetCapacityReport(30)
+      .then(({ data }) => setAlerts(data.data ?? []))
+      .catch(() => setAlerts([]))
+      .finally(() => setLoadingAlerts(false))
   }
 
   const handleDeleteHotel = async (hotelId, name) => {
@@ -44,6 +56,10 @@ export default function AdminPage() {
   }
 
   useEffect(() => { loadHotels() }, [])
+
+  useEffect(() => {
+    if (tab === 'notifications') loadAlerts()
+  }, [tab])
 
   useEffect(() => {
     if (!selectedHotelId) { setRoomTypes([]); return }
@@ -112,9 +128,10 @@ export default function AdminPage() {
   const set = (setter, key) => (e) => setter((f) => ({ ...f, [key]: e.target.value }))
 
   const TABS = [
-    { key: 'hotels',    label: '🏨 Hotels' },
-    { key: 'roomtypes', label: '🛏 Room Types' },
-    { key: 'inventory', label: '📅 Inventory' },
+    { key: 'hotels',        label: '🏨 Hotels' },
+    { key: 'roomtypes',     label: '🛏 Room Types' },
+    { key: 'inventory',     label: '📅 Inventory' },
+    { key: 'notifications', label: '🔔 Notifications' },
   ]
 
   return (
@@ -134,7 +151,7 @@ export default function AdminPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
+      <div className="flex gap-1 mb-6 border-b border-slate-200 flex-wrap">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -146,6 +163,11 @@ export default function AdminPage() {
             }`}
           >
             {t.label}
+            {t.key === 'notifications' && alerts.length > 0 && (
+              <span className="ml-1.5 bg-red-500 text-white text-xs font-bold rounded-full px-1.5 py-0.5">
+                {alerts.length}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -295,6 +317,73 @@ export default function AdminPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Notifications tab */}
+      {tab === 'notifications' && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-slate-700">Low Capacity Alerts</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Room types with less than 20% availability in the next 30 days.
+                The nightly scheduler checks this and sends alerts automatically.
+              </p>
+            </div>
+            <button
+              onClick={loadAlerts}
+              className="text-xs text-teal-600 hover:text-teal-700 font-semibold border border-teal-200 rounded-lg px-3 py-1.5 transition"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {loadingAlerts && <p className="text-slate-400 text-sm animate-pulse">Loading alerts...</p>}
+
+          {!loadingAlerts && alerts.length === 0 && (
+            <div className="bg-teal-50 border border-teal-100 rounded-2xl p-6 text-center">
+              <p className="text-teal-700 font-semibold text-sm">All clear — no low-capacity rooms in the next 30 days.</p>
+              <p className="text-teal-500 text-xs mt-1">The nightly job will alert you here if capacity drops below 20%.</p>
+            </div>
+          )}
+
+          {!loadingAlerts && alerts.map((a, i) => {
+            const pct = Math.round((a.capacityRatio ?? 0) * 100)
+            const urgency = pct <= 5 ? 'critical' : pct <= 10 ? 'high' : 'medium'
+            const colors = {
+              critical: 'bg-red-50 border-red-200 text-red-700',
+              high:     'bg-orange-50 border-orange-200 text-orange-700',
+              medium:   'bg-amber-50 border-amber-200 text-amber-700',
+            }
+            const barColor = {
+              critical: 'bg-red-400',
+              high:     'bg-orange-400',
+              medium:   'bg-amber-400',
+            }
+            return (
+              <div key={i} className={`rounded-2xl border p-4 ${colors[urgency]}`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-bold text-sm">{a.hotelName}</p>
+                    <p className="text-xs opacity-80 mt-0.5">{a.roomTypeName} · {a.startDate?.slice(0,10)} – {a.endDate?.slice(0,10)}</p>
+                  </div>
+                  <span className="text-xs font-bold bg-white bg-opacity-60 rounded-lg px-2 py-1 shrink-0">
+                    {a.availableCount} / {a.totalCount} rooms
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span>Capacity</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className="w-full bg-white bg-opacity-50 rounded-full h-2">
+                    <div className={`h-2 rounded-full ${barColor[urgency]}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
