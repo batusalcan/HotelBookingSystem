@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using NotificationService.Data;
 using NotificationService.HttpClients;
 using NotificationService.Messaging;
@@ -23,6 +24,9 @@ public class CapacityAlertJob(
             logger.LogInformation("Capacity alert job: no hotels below 20% threshold found.");
             return;
         }
+
+        // Replace previous run's snapshot with the current one
+        await db.NotificationAlerts.ExecuteDeleteAsync();
 
         var notification = factory.Create(NotificationType.LowCapacity);
         var alerts = new List<NotificationAlert>();
