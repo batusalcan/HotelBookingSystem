@@ -18,6 +18,10 @@
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
       "RateLimitOptions": { "EnableRateLimiting": false }
     },
 
@@ -28,6 +32,10 @@
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
       "RateLimitOptions": { "EnableRateLimiting": false }
     },
 
@@ -38,6 +46,10 @@
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [ { "Host": "hotel-hotelservice-aje8f7f7dqb5f0a5.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "hotelservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
       "RateLimitOptions": { "EnableRateLimiting": false }
     },
 
@@ -102,6 +114,10 @@
       "DownstreamScheme": "https",
       "DownstreamHostAndPorts": [ { "Host": "hotel-notification-eccyh5cpdxhpg9b2.italynorth-01.azurewebsites.net", "Port": 443 } ],
       "SwaggerKey": "notificationservice",
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer",
+        "AllowedScopes": []
+      },
       "RateLimitOptions": { "EnableRateLimiting": false }
     },
 
