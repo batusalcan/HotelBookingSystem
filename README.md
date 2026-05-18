@@ -48,7 +48,7 @@ All backend services are deployed to **Azure App Service Linux (Italy North, B1 
 
 ## 2. Demo Video
 
-> **[Video link — to be added]**
+> **[Watch on YouTube](https://youtu.be/Wz1Uj_aYWTE)**
 
 ---
 
