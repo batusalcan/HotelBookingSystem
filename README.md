@@ -535,9 +535,11 @@ The system ships with seed data for meaningful end-to-end testing:
 
 ### Assumptions
 
-**Assumption 1 — Booking requires JWT authentication**
+**Assumption 1 — Booking and AI Agent require JWT authentication; search is public**
 
-> The project document specifies that logged-in users will receive a 15% discount, implying that hotel search should be accessible to unauthenticated users. Therefore, searching for hotels is open to the public. However, since the system does not require a payment transaction, the "Book Hotel" operation has been restricted exclusively to authenticated users via the IAM service (Supabase Auth). This architectural decision was made to prevent malicious/spam reservations, ensure that hotel capacities are safely and accurately reduced, and properly track the reservation owner via the JWT `sub` claim.
+> The project document specifies that logged-in users will receive a 15% discount, implying that hotel search should be accessible to unauthenticated users. Therefore, searching for hotels is open to the public. However, the following features require the user to create an account and log in via the IAM service (Supabase Auth):
+> - **Book Hotel** — restricted to authenticated users to prevent spam reservations, safely decrement capacity, and track the reservation owner via the JWT `sub` claim.
+> - **AI Agent chat** — restricted to authenticated users because the agent can initiate bookings on the user's behalf. Allowing anonymous users to trigger bookings through the AI would bypass the same anti-spam and capacity-safety guarantees that protect the direct booking flow.
 
 **Assumption 2 — POST /comments requires JWT authentication**
 
