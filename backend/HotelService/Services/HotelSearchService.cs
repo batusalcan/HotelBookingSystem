@@ -22,7 +22,7 @@ public class HotelSearchService(
     /// Prices are discounted 15% if isAuthenticated=true (AuthenticatedPricingStrategy), unchanged otherwise (GuestPricingStrategy).
     /// Results sourced from Redis cache if available (cache-aside), falling back to SQL and repopulating cache.
     /// </postcondition>
-    public async Task<PaginatedResult<HotelSearchResult>> SearchAsync(HotelSearchRequest request, bool isAuthenticated)
+    public async Task<(PaginatedResult<HotelSearchResult> Result, bool CacheHit)> SearchAsync(HotelSearchRequest request, bool isAuthenticated)
     {
         IPricingStrategy pricing = isAuthenticated
             ? new AuthenticatedPricingStrategy()
@@ -33,11 +33,13 @@ public class HotelSearchService(
         var cached = await cache.GetAsync(cacheKey);
 
         List<HotelSearchResult> allResults;
+        bool cacheHit;
 
         if (cached is not null)
         {
             logger.LogInformation("Cache HIT for key {Key}", cacheKey);
             allResults = JsonSerializer.Deserialize<List<HotelSearchResult>>(cached, JsonOpts) ?? [];
+            cacheHit = true;
         }
         else
         {
@@ -46,6 +48,7 @@ public class HotelSearchService(
 
             var ttlMinutes = int.Parse(config["Cache:SearchTtlMinutes"] ?? "15");
             await cache.SetAsync(cacheKey, JsonSerializer.Serialize(allResults, JsonOpts), TimeSpan.FromMinutes(ttlMinutes));
+            cacheHit = false;
         }
 
         // Dedup here (not inside QuerySqlAsync) so cached data is also deduplicated
@@ -60,7 +63,8 @@ public class HotelSearchService(
         var totalRecords = priced.Count;
         var paged = priced.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize);
 
-        return PaginatedResult<HotelSearchResult>.Create(paged, totalRecords, request.Page, request.PageSize);
+        var result = PaginatedResult<HotelSearchResult>.Create(paged, totalRecords, request.Page, request.PageSize);
+        return (result, cacheHit);
     }
 
     private async Task<List<HotelSearchResult>> QuerySqlAsync(HotelSearchRequest request)

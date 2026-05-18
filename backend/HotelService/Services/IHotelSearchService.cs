@@ -5,5 +5,5 @@ namespace HotelService.Services;
 
 public interface IHotelSearchService
 {
-    Task<PaginatedResult<HotelSearchResult>> SearchAsync(HotelSearchRequest request, bool isAuthenticated);
+    Task<(PaginatedResult<HotelSearchResult> Result, bool CacheHit)> SearchAsync(HotelSearchRequest request, bool isAuthenticated);
 }

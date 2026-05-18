@@ -13,7 +13,8 @@ public class SearchController(IHotelSearchService searchService) : ControllerBas
     public async Task<IActionResult> SearchHotels([FromQuery] HotelSearchRequest request)
     {
         bool isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-        var results = await searchService.SearchAsync(request, isAuthenticated);
+        var (results, cacheHit) = await searchService.SearchAsync(request, isAuthenticated);
+        Response.Headers["X-Cache"] = cacheHit ? "HIT" : "MISS";
         return Ok(ApiResponse<object>.Ok(new
         {
             results.Page,
